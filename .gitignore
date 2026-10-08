@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets: never commit real keys or credentials
+.env
+
+# Working run output (selected runs are copied into evidence/)
+runs/
+
+# Assignment document (private)
+docs/
+
+# macOS
+.DS_Store

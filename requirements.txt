@@ -1,0 +1,18 @@
+# Target app
+Flask==3.1.3
+
+# Browser automation (only src/browser/ imports this)
+playwright==1.63.0
+
+# Typed models for recipes, results, logs, policy
+pydantic==2.13.5
+
+# Loads LLM keys and bank credentials from .env
+python-dotenv==1.2.4
+
+# LLM providers (client is provider-agnostic; pick one in .env)
+anthropic==1.12.0
+openai==3.26.0
+
+# Tests
+pytest==9.1.1
