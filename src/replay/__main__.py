@@ -7,7 +7,8 @@
 right before a step's action. It calls the bank's /_admin switch directly, like curl: test
 tooling, outside the browser and outside the automation's allowlist.
 
-The bank must be running on :5050. Risky steps are rejected for now (approval prompt: step 9).
+The bank must be running on :5050. With a person at the keyboard, risky steps ask for
+approval and a hard failure hands the browser to you (type resume or abort). --no-human disables both.
 The browser stays open after the run until you press Enter (use --auto-close to skip that).
 """
 
@@ -16,7 +17,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from src.handoff import open_session
+from src.handoff import TerminalOperator, open_session, reject_all
 from src.models import Recipe
 
 from .engine import replay
@@ -28,6 +29,8 @@ def main() -> None:
     parser.add_argument("inputs", nargs="*", help="name=value pairs, e.g. member_id=12345")
     parser.add_argument("--slow", action="store_true", help="slow the browser down so you can watch")
     parser.add_argument("--auto-close", action="store_true", help="close the browser as soon as the run ends")
+    parser.add_argument("--no-human", action="store_true",
+                        help="no operator: reject risky steps and stop instead of handing over")
     parser.add_argument("--inject", choices=["popup", "slow_page", "session_expired", "server_error"],
                         help="arm a bank test error before a step (demo/testing only)")
     parser.add_argument("--at-step", type=int, default=3, help="which step --inject fires before (default 3)")
@@ -39,10 +42,13 @@ def main() -> None:
     except ValueError:
         raise SystemExit("inputs must look like name=value")
 
-    with open_session("replay", slow_mo_ms=600 if args.slow else 0) as session:
+    # A person at the keyboard is the operator: approves risky steps and takes over when stuck.
+    operator = None if args.no_human or not sys.stdin.isatty() else TerminalOperator()
+    approver = operator.approve if operator else reject_all
+    with open_session("replay", slow_mo_ms=600 if args.slow else 0, approver=approver) as session:
         if args.inject:
             inject_before_step(session, args.inject, args.at_step)
-        result = replay(recipe, inputs, session).run_result
+        result = replay(recipe, inputs, session, operator).run_result
         print(f"\nResult: {result.status.value}" + (f" ({result.outcome_code})" if result.outcome_code else "")
               + (f" - {result.message}" if result.message else ""))
         for name, value in result.outputs.items():
@@ -51,7 +57,7 @@ def main() -> None:
             f = result.failure
             print(f"  failed at step {f.step} [{f.error_type}]\n    expected: {f.expected}\n    observed: {f.observed}")
             print("    evidence: " + ", ".join(Path(e).name for e in f.evidence))
-        for note in result.recoveries + result.warnings:
+        for note in result.recoveries + result.warnings + result.human_interventions + result.approvals:
             print(f"  note: {note}")
         print(f"  run folder: {session.logger.folder.path}")
         if not args.auto_close and sys.stdin.isatty():

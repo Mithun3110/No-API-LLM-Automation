@@ -291,6 +291,16 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
    - While the human is in control, a small script injected into the page records their clicks and typing (masked) and sends them back to Python through Playwright's `expose_binding`.
    - The human types `resume` or `abort`. On `resume`, the automation reads the page again and continues from the latest step whose `expect_page` matches the current page. If no step matches, it is a hard failure. (In discovery, resume simply returns control to the agent loop, which re-reads the page.)
    - Risky action approval: the terminal shows exactly what will happen (masked) and asks `yes` or `no`.
+   - Built in step 9 (`src/handoff/operator.py`, `src/handoff/takeover.py`):
+     - `Operator` interface: `notify(request)`, `wait_for_decision(browser) -> resume|abort`, `approve(request) -> bool`. `TerminalOperator` for real use; `ScriptedOperator` for tests (its "human" acts through real DOM events, so recording is tested for real). Production: an operator queue with remote co-browsing behind the same interface.
+     - `take_over(...)`: control PAUSED -> screenshot + `intervention_<n>.json` (masked) + notify -> control HUMAN + start recording -> wait for resume/abort -> settle -> control AUTOMATION (resume) or stays PAUSED (abort). Bounded by `settings.max_takeovers` (3).
+     - Waiting for the human does not block Python on `input()`: it alternates short `browser.wait()` slices (so recorded actions are delivered) with a non-blocking check of the terminal.
+     - Recording: a script injected into every page (`add_init_script` + `expose_binding`) reports clicks, typing (on `change`), dropdowns and Enter-submits with role, name, label, field name, dialog and page heading. Password values are never sent ("***"). Reports are ignored unless a human is in control. Logged in mode `human`, masked.
+     - Replay: a hard failure with an operator -> takeover; on resume, continue at the resume point; if no step matches -> hard failure `no_resume_point` (another takeover if allowed). Abort -> ABORTED_BY_OPERATOR. Still failing after a takeover -> ESCALATED. Without an operator, hard failures are returned as FAILED (so `ask` can try bounded recovery first).
+     - Resume point (refined): the latest step whose `expect_page` matches the current page, moved back to the FIRST of the consecutive steps recorded on that same page. Reason: on the search page, steps "type ID" and "click Search" share one page; resuming at the click would submit an empty box. The steps moved back over are repeatable (type/select).
+     - Discovery: stuck with an operator -> takeover; on resume the human's actions are added as steps with `source: human` (shown to the LLM as "HUMAN OPERATOR: ..."), failure counters reset, and the agent gets a fresh step budget. Abort -> ABORTED_BY_OPERATOR. Human-step locators come from what the recorder saw and could not be re-verified, so a recipe with human steps is saved with `needs_review: true`.
+     - Runners use `TerminalOperator` when a person is at the keyboard; `--no-human` disables approvals and takeover.
+   - Page identity (changed in step 9): `expect_page` and `only_if` are `{ "heading": "..." }` or `{ "text_visible": "..." }`; `wait_for` conditions are `heading`, `text` or `url_contains`; `success_check` may have `heading`. The recorder uses `heading`. Reason: text anywhere on the page cannot identify it, because legacy navigation repeats page names ("Member Search" is a link on every page, "Back to Member Detail" on every member sub-page).
 
 10. Browser layer (`src/browser/`)
     - The only module that imports Playwright.
@@ -427,7 +437,7 @@ Real recipes use real booleans and numbers, not quoted placeholders.
       "step": 1,
       "description": "<what this step does, in plain words>",
       "source": "<agent | human>",
-      "expect_page": { "text_visible": "<text that proves we are on the right page before this step, e.g. Member Search>" },
+      "expect_page": { "heading": "<the page heading before this step, e.g. Member Search>" },
       "action": "<navigate | click | type | select | extract>",
       "target": {
         "strategies": [
@@ -443,7 +453,7 @@ Real recipes use real booleans and numbers, not quoted placeholders.
       "parse": "<currency | text | number, only for extract>",
       "only_if": { "text_visible": "<optional: run this step only if this is on the page>" },
       "risk": "<safe | irreversible>",
-      "wait_for": { "any_of": [ { "text": "<text expected after this step>" } ] }
+      "wait_for": { "any_of": [ { "heading": "<page heading expected after this step>" } ] }
     }
   ],
 

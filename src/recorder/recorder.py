@@ -84,7 +84,8 @@ class _Builder:
             "description": self._clean(self.task.description),
             "version": next_version(recipe_id, recipes_dir),
             "status": "draft",  # never runs unreviewed in strict mode until approved
-            "needs_review": False,
+            # Human steps could not be re-verified and were not chosen by the agent: review them.
+            "needs_review": any(s.source == "human" for s in agent_steps),
             "app": {**self.rules["app"], "entry_url": self.settings.bank_base_url + self.settings.entry_path},
             "provenance": {"recorded_from_run": self.run_id, "recorded_at": datetime.now(timezone.utc).isoformat()},
             "inputs": {i.name: {"description": self.masker.mask_text(i.description) or i.name, "type": i.type,
@@ -95,7 +96,7 @@ class _Builder:
             "outcomes": {"SUCCESS": "The goal was completed and outputs were read.", **self.rules["outcomes"]},
             "steps": steps,
             "success_check": {"description": "On the final page with every output read.",
-                              "text_visible": last_heading or None,
+                              "heading": last_heading or None,
                               "outputs_present": [o.name for o in self.task.outputs]},
             "error_handlers": self.rules["error_handlers"],
             "default_on_unknown": {"type": "hard_failure", "then": "escalate"},
@@ -112,15 +113,15 @@ class _Builder:
         step = {"step": 1, "description": f"Open the {heading or 'entry'} page.", "source": "agent",
                 "action": "navigate", "url": self.settings.entry_path, "risk": "safe"}
         if heading:
-            step["wait_for"] = {"any_of": [{"text": heading}]}
+            step["wait_for"] = {"any_of": [{"heading": heading}]}
         return step
 
     def _step(self, number: int, s: AgentStep) -> dict:
         action = TOOL_TO_ACTION[s.tool]
         step: dict = {"step": number, "description": self._clean(s.args.get("reason")) or s.tool,
-                      "source": "agent", "action": action, "risk": "safe"}
+                      "source": s.source, "action": action, "risk": "safe"}
         if s.heading_before:
-            step["expect_page"] = {"text_visible": s.heading_before}
+            step["expect_page"] = {"heading": s.heading_before}
         if action == "navigate":
             step["url"] = self._placeholder(s.value or "", s.number)
         else:
@@ -134,7 +135,7 @@ class _Builder:
         if action == "click" and self._risky(strategies):
             step["risk"] = "irreversible"
         if s.heading_after and s.heading_after != s.heading_before:
-            step["wait_for"] = {"any_of": [{"text": s.heading_after}]}
+            step["wait_for"] = {"any_of": [{"heading": s.heading_after}]}
         return step
 
     # ------------------------------------------------------------ rules

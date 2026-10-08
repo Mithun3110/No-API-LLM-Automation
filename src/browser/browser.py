@@ -25,6 +25,56 @@ from src.models.recipe import (
 ACTION_TIMEOUT_MS = 5_000
 POLL_INTERVAL_MS = 200
 
+# Injected into every page. Reports what a HUMAN does (clicks, typing, dropdowns) back to Python
+# through an exposed binding. Passwords are never sent. It runs on every page, but Python only
+# keeps the reports while a human is in control.
+HUMAN_RECORDER_JS = r"""
+(() => {
+  if (window.__humanRecorderInstalled) return;
+  window.__humanRecorderInstalled = true;
+  const roleOf = el => {
+    const t = el.tagName.toLowerCase(), ty = (el.getAttribute('type') || 'text').toLowerCase();
+    if (t === 'a') return 'link';
+    if (t === 'button' || (t === 'input' && ['submit', 'button'].includes(ty))) return 'button';
+    if (t === 'select') return 'combobox';
+    if (t === 'textarea' || t === 'input') return 'textbox';
+    return null;
+  };
+  const label = el => (el.labels && el.labels.length) ? el.labels[0].innerText.trim() : null;
+  const nameOf = el => label(el) || el.getAttribute('aria-label')
+      || (el.tagName === 'INPUT' && ['submit', 'button'].includes(el.type) ? el.value : null)
+      || (el.innerText || '').trim();
+  const heading = () => { const h = document.querySelector('h1, h2'); return h ? h.innerText.trim() : ''; };
+  const dialogOf = el => {
+    const d = el.closest('[role=dialog]');
+    if (!d) return null;
+    const id = d.getAttribute('aria-labelledby');
+    return id && document.getElementById(id) ? document.getElementById(id).innerText.trim() : 'dialog';
+  };
+  const info = el => ({ role: roleOf(el), name: (nameOf(el) || '').slice(0, 80), label: label(el),
+                        tag: el.tagName.toLowerCase(), field: el.getAttribute('name'),
+                        type: el.getAttribute('type'), value_attr: el.getAttribute('value'),
+                        dialog: dialogOf(el), heading: heading(), path: location.pathname });
+  const report = data => { try { window.__humanAction(data); } catch (e) {} };
+  document.addEventListener('click', e => {
+    const el = e.target.closest('a, button, input[type=submit], input[type=button]');
+    if (el) report({ kind: 'click', ...info(el) });
+  }, true);
+  document.addEventListener('change', e => {
+    const el = e.target;
+    if (!el.matches('input, select, textarea') || ['submit', 'button'].includes(el.type)) return;
+    const value = el.type === 'password' ? '***'
+        : el.tagName === 'SELECT' ? el.options[el.selectedIndex].text : el.value;
+    report({ kind: el.tagName === 'SELECT' ? 'select' : 'type', value, ...info(el) });
+  }, true);
+  document.addEventListener('submit', e => {
+    if (e.submitter) return;  // a click on the button was already reported
+    const b = e.target.querySelector('input[type=submit], button[type=submit], button');
+    if (b) report({ kind: 'click', ...info(b), pressed_enter: true });
+  }, true);
+})();
+"""
+
 # YAML quotes a line in '...' when the name contains a colon, so both forms are matched.
 CONTAINER_NAME = re.compile(r"""^(\s*- )'?(table|rowgroup|row|cell|generic) ".*"'?:$""")
 
@@ -81,8 +131,16 @@ class Browser:
     def __init__(self, headless: bool = False, slow_mo_ms: int = 0):
         self._playwright = sync_playwright().start()
         # Visible by default: the human operator must be able to take over this same window.
-        self._browser = self._playwright.chromium.launch(headless=headless, slow_mo=slow_mo_ms)
-        self._context = self._browser.new_context(viewport={"width": 1280, "height": 900})
+        if headless:
+            self._browser = self._playwright.chromium.launch(headless=True, slow_mo=slow_mo_ms)
+            self._context = self._browser.new_context(viewport={"width": 1280, "height": 900})
+        else:
+            # Visible window: use the REAL window size, not an emulated viewport. With emulation,
+            # native dropdown menus (<select>) are drawn by macOS at the wrong place on screen,
+            # away from their field, which confuses the human operator.
+            self._browser = self._playwright.chromium.launch(
+                headless=False, slow_mo=slow_mo_ms, args=["--window-size=1280,900"])
+            self._context = self._browser.new_context(no_viewport=True)
         self._context.set_default_timeout(ACTION_TIMEOUT_MS)
         self.page: Page = self._context.new_page()
         self._tracing = False
@@ -92,6 +150,8 @@ class Browser:
         self.page.on("request", self._on_request)
         self.page.on("requestfinished", self._on_request_done)
         self.page.on("requestfailed", self._on_request_done)
+        self._human_listener = None
+        self._recorder_installed = False
 
     def _on_request(self, request) -> None:
         if request.is_navigation_request() and request.frame == self.page.main_frame:
@@ -143,6 +203,20 @@ class Browser:
             lines.append(line)
         return "\n".join(lines)
 
+    def has_heading(self, text: str) -> bool:
+        """True if a visible h1/h2 has exactly this text: identifies the page, unlike text_visible."""
+        return self.page.locator("h1, h2").filter(visible=True).filter(
+            has_text=re.compile(rf"^\s*{re.escape(text)}\s*$")).count() > 0
+
+    def page_matches(self, condition) -> bool:
+        """PageCondition or WaitCondition: heading, text, text_visible or url_contains."""
+        if getattr(condition, "heading", None) is not None:
+            return self.has_heading(condition.heading)
+        text = getattr(condition, "text", None) or getattr(condition, "text_visible", None)
+        if text is not None:
+            return self.text_visible(text)
+        return condition.url_contains in self.page.url
+
     def heading(self) -> str:
         """The page's main heading (first visible h1/h2), e.g. "Member Detail". Empty if none."""
         h = self.page.locator("h1, h2").filter(visible=True)
@@ -169,9 +243,7 @@ class Browser:
         deadline = time.monotonic() + timeout_s
         while True:
             for c in conditions:
-                if c.text is not None and self.text_visible(c.text):
-                    return c
-                if c.url_contains is not None and c.url_contains in self.page.url:
+                if self.page_matches(c):
                     return c
             if time.monotonic() >= deadline:
                 return None
@@ -250,6 +322,23 @@ class Browser:
             return anchor_cell  # let find() report 0 or many matches
         column = anchor_cell.evaluate("cell => cell.cellIndex") + 1
         return anchor_cell.locator(f"xpath=parent::tr/following-sibling::tr[1]/*[self::td or self::th][{column}]")
+
+    # ------------------------------------------------------------ human recording
+    def start_human_recording(self, on_action) -> None:
+        """Report the human's actions on this page and every page after it to on_action(dict)."""
+        if not self._recorder_installed:
+            self.page.expose_binding("__humanAction", lambda _source, data: self._on_human_action(data))
+            self._context.add_init_script(HUMAN_RECORDER_JS)  # every future page
+            self._recorder_installed = True
+        self.page.evaluate(HUMAN_RECORDER_JS)                  # the page already open
+        self._human_listener = on_action
+
+    def stop_human_recording(self) -> None:
+        self._human_listener = None
+
+    def _on_human_action(self, data: dict) -> None:
+        if self._human_listener is not None:  # ignored unless a human is in control
+            self._human_listener(data)
 
     # ------------------------------------------------------------ recording
     def element_facts(self, element: Element) -> dict:

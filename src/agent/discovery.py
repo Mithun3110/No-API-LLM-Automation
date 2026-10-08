@@ -19,10 +19,10 @@ from typing import Literal
 
 from pydantic import ValidationError
 
-from src.handoff import Action, Session
+from src.handoff import Action, HumanAction, Operator, Session, TakeoverResult, take_over
 from src.models import FailureInfo, RunResult, RunStatus
 from src.models.intervention import StopReason
-from src.models.recipe import Strategy
+from src.models.recipe import CssStrategy, LabelStrategy, RoleStrategy, Strategy
 from src.models.values import ParseError, parse_value
 
 from . import prompts
@@ -30,8 +30,17 @@ from .llm import LLMClient, LLMError
 from .tools import ACTION_TOOLS, TASK_TOOLS, AskHuman, DefineTask, Done, Extract, tool_specs, to_action
 
 HISTORY_SHOWN = 12  # most recent actions included in each prompt
+HUMAN_TOOLS = {"click": "click", "type": "type_text", "select": "select_option"}  # recorder kind -> tool
 
-Outcome = Literal["success", "not_achievable", "rejected", "stuck", "llm_error"]
+Outcome = Literal["success", "not_achievable", "rejected", "stuck", "aborted", "llm_error"]
+
+
+@dataclass
+class Stop:
+    """Why the loop stopped. run() decides: hand over to a human (stuck) or finish."""
+    outcome: Outcome
+    stop_reason: StopReason | None = None
+    detail: str = ""
 
 
 @dataclass
@@ -50,10 +59,12 @@ class AgentStep:
     locators: list[Strategy] = field(default_factory=list)  # verified, in preference order
     in_dialog: str | None = None   # name of the dialog the element was in, e.g. "Notice"
     value: str | None = None       # what was typed/selected, or the navigate path
+    source: str = "agent"          # agent, or human (done by the operator during a takeover)
 
     def history_line(self) -> str:
         args = {k: v for k, v in self.args.items() if k != "reason"}
-        line = f"{self.number}. {self.tool} {args} -> {self.status}"
+        who = "HUMAN OPERATOR: " if self.source == "human" else ""
+        line = f"{self.number}. {who}{self.tool} {args} -> {self.status}"
         if self.message:
             line += f": {self.message}"
         if self.status == "done" and self.heading_after:
@@ -75,12 +86,13 @@ class DiscoveryResult:
     @property
     def successful_steps(self) -> list[AgentStep]:
         """What the recorder turns into recipe steps: only actions that worked."""
-        return [s for s in self.steps if s.status == "done" and s.tool not in ("done", "wait")]
+        return [s for s in self.steps if s.status == "done" and s.tool not in ("done", "wait", "ask_human")]
 
 
 class Discovery:
-    def __init__(self, session: Session, llm: LLMClient, goal: str):
+    def __init__(self, session: Session, llm: LLMClient, goal: str, operator: Operator | None = None):
         self.session = session
+        self.operator = operator
         self.llm = llm
         self.goal = goal
         self.settings = session.settings
@@ -100,18 +112,62 @@ class Discovery:
             return self._finish("llm_error", detail=f"could not define the task: {e}")
 
         deadline = time.monotonic() + self.settings.discovery_timeout_s
-        for number in range(1, self.settings.step_limit + 1):
-            if time.monotonic() > deadline:
-                return self._finish("stuck", "timeout", f"no result after {self.settings.discovery_timeout_s:.0f}s")
-            try:
-                call = self.llm.decide(prompts.SYSTEM, self._step_prompt(), tool_specs(ACTION_TOOLS))
-            except LLMError as e:
-                return self._finish("llm_error", detail=str(e))
+        number, budget = 0, self.settings.step_limit
+        while True:
+            stop = None
+            if budget == 0:
+                stop = Stop("stuck", "step_limit", f"goal not reached in {self.settings.step_limit} steps")
+            elif time.monotonic() > deadline:
+                stop = Stop("stuck", "timeout", f"no result after {self.settings.discovery_timeout_s:.0f}s")
+            else:
+                number, budget = number + 1, budget - 1
+                try:
+                    call = self.llm.decide(prompts.SYSTEM, self._step_prompt(), tool_specs(ACTION_TOOLS))
+                except LLMError as e:
+                    return self._finish("llm_error", detail=str(e))
+                stop = self._handle(number, call.name, call.arguments)
+            if stop is None:
+                continue
+            if stop.outcome == "stuck" and self._can_hand_over():
+                if self._hand_over(stop) == "abort":
+                    return self._finish("aborted", stop.stop_reason, "operator aborted the run")
+                number = self.steps[-1].number if self.steps else number
+                budget = self.settings.step_limit  # the agent gets a fresh budget after a human helped
+                deadline = time.monotonic() + self.settings.discovery_timeout_s
+                continue
+            return self._finish(stop.outcome, stop.stop_reason, stop.detail)
 
-            finished = self._handle(number, call.name, call.arguments)
-            if finished:
-                return finished
-        return self._finish("stuck", "step_limit", f"goal not reached in {self.settings.step_limit} steps")
+    # ------------------------------------------------------------ human takeover
+    def _can_hand_over(self) -> bool:
+        return self.operator is not None and self.session.takeovers < self.settings.max_takeovers
+
+    def _hand_over(self, stop: Stop) -> str:
+        last = self.steps[-1] if self.steps else None
+        result = take_over(self.session, self.operator, "discover", stop.stop_reason, stop.detail,
+                           goal=self.goal, step=last.number if last else None,
+                           step_description=last.args.get("reason") if last else None)
+        if result.decision == "resume":
+            self._add_human_steps(result)
+            self._failures.clear()  # the human changed the situation: old failures no longer count
+        return result.decision
+
+    def _add_human_steps(self, result: TakeoverResult) -> None:
+        """What the human did becomes part of the run (and so of the recipe), marked source=human."""
+        actions = result.actions
+        for i, a in enumerate(actions):
+            tool = HUMAN_TOOLS.get(a.kind, "click")
+            if tool == "click":
+                args = {"role": a.role, "name": a.name}
+            elif tool == "type_text":
+                args = {"name": a.name, "text": a.value}
+            else:
+                args = {"name": a.name, "option": a.value}
+            args["reason"] = "done by the human operator"
+            heading_after = actions[i + 1].heading if i + 1 < len(actions) else result.heading_after
+            number = (self.steps[-1].number if self.steps else 0) + 1
+            self._add(AgentStep(number, tool, args, "done", url_after="", heading_before=a.heading,
+                                heading_after=heading_after, locators=human_locators(a), in_dialog=a.dialog,
+                                value=a.value, source="human"))
 
     def _define_task(self) -> DefineTask:
         call = self.llm.decide(prompts.SYSTEM, prompts.TASK_PROMPT.format(goal=self.goal), tool_specs(TASK_TOOLS))
@@ -131,7 +187,7 @@ class Discovery:
         return task
 
     # ------------------------------------------------------------ one turn
-    def _handle(self, number: int, tool: str, arguments: dict) -> DiscoveryResult | None:
+    def _handle(self, number: int, tool: str, arguments: dict) -> "Stop | None":
         model = ACTION_TOOLS.get(tool)
         if model is None:
             return self._record_failure(number, tool, arguments, "invalid", f"unknown tool '{tool}'")
@@ -142,7 +198,7 @@ class Discovery:
 
         if isinstance(args, AskHuman):
             self._add(AgentStep(number, tool, arguments, "done"))
-            return self._finish("stuck", "agent_asked", args.reason)
+            return Stop("stuck", "agent_asked", args.reason)
         if isinstance(args, Done):
             return self._handle_done(number, tool, arguments, args)
         if isinstance(args, Extract) and args.output not in self._output_names():
@@ -164,7 +220,7 @@ class Discovery:
             step.message = "the next page is still loading"  # the model sees this and can wait
         if outcome.status == "rejected":
             self._add(step)
-            return self._finish("rejected", detail=outcome.message)
+            return Stop("rejected", detail=outcome.message)
         if not outcome.ok:
             return self._record_failure(number, tool, arguments, outcome.status, outcome.message, step)
 
@@ -182,21 +238,21 @@ class Discovery:
         if tool == "click" and self._fingerprint() == before:
             step.status, step.message = "unchanged", "the page did not change"
             self._add(step)
-            return self._finish("stuck", "page_unchanged", f'clicking "{args.name}" changed nothing')
+            return Stop("stuck", "page_unchanged", f'clicking "{args.name}" changed nothing')
 
         self._add(step)
         return None
 
-    def _handle_done(self, number: int, tool: str, arguments: dict, args: Done) -> DiscoveryResult | None:
+    def _handle_done(self, number: int, tool: str, arguments: dict, args: Done) -> "Stop | None":
         if not args.success:
             self._add(AgentStep(number, tool, arguments, "done", args.summary))
-            return self._finish("not_achievable", detail=args.summary)
+            return Stop("not_achievable", detail=args.summary)
         missing = self._missing_outputs()
         if missing:
             return self._record_failure(number, tool, arguments, "invalid",
                                         f"outputs not extracted yet: {', '.join(missing)}")
         self._add(AgentStep(number, tool, arguments, "done", args.summary))
-        return self._finish("success", detail=args.summary)
+        return Stop("success", detail=args.summary)
 
     def _record_failure(self, number, tool, arguments, status, message, step: AgentStep | None = None):
         """Log a failed attempt; the same action failing twice means the agent is stuck."""
@@ -206,7 +262,7 @@ class Discovery:
         signature = f"{tool}:{sorted((k, str(v)) for k, v in arguments.items() if k != 'reason')}"
         self._failures[signature] = self._failures.get(signature, 0) + 1
         if self._failures[signature] >= 2:
-            return self._finish("stuck", "repeated_failure", f"{tool} failed twice: {message}")
+            return Stop("stuck", "repeated_failure", f"{tool} failed twice: {message}")
         return None
 
     # ------------------------------------------------------------ helpers
@@ -268,21 +324,44 @@ class Discovery:
     def _run_result(self, r: DiscoveryResult, evidence: list[str]) -> RunResult:
         common = dict(run_id=self.session.logger.run_id, mode="discover",
                       recipe_id=r.task.recipe_id if r.task else None,
+                      approvals=list(self.session.approvals),
+                      human_interventions=list(self.session.human_interventions),
                       log_file=str(self.session.logger.folder.log_path))
         if r.outcome == "success":
             return RunResult(status=RunStatus.SUCCESS, outputs=r.outputs, message=r.detail, **common)
         if r.outcome == "rejected":
             return RunResult(status=RunStatus.REJECTED_BY_OPERATOR, message=r.detail, **common)
+        if r.outcome == "aborted":
+            return RunResult(status=RunStatus.ABORTED_BY_OPERATOR, message=r.detail, **common)
         last = self.steps[-1].number if self.steps else None
-        return RunResult(status=RunStatus.FAILED, message=r.detail, **common, failure=FailureInfo(
+        # ESCALATED: a human already had it and it still did not finish.
+        status = RunStatus.ESCALATED if self.session.takeovers else RunStatus.FAILED
+        return RunResult(status=status, message=r.detail, **common, failure=FailureInfo(
             step=last, expected="the goal to be reached", observed=r.detail,
             error_type=r.stop_reason or r.outcome, evidence=evidence))
 
 
-def run_discovery(session: Session, llm: LLMClient, goal: str) -> DiscoveryResult:
-    """Open the entry page and let the agent work towards the goal."""
+def run_discovery(session: Session, llm: LLMClient, goal: str, operator: Operator | None = None) -> DiscoveryResult:
+    """Open the entry page and let the agent work towards the goal. With an operator, being
+    stuck leads to human takeover on this same session instead of ending the run."""
     session.perform(Action("navigate", url=session.settings.entry_path, mode="discover", reason="open entry page"))
-    return Discovery(session, llm, goal).run()
+    return Discovery(session, llm, goal, operator).run()
+
+
+def human_locators(a: HumanAction) -> list[Strategy]:
+    """Locators for an element the human used. Built from what the in-page recorder saw; they
+    could not be re-verified (the page has moved on), which is one reason human steps make the
+    recipe needs_review."""
+    out: list[Strategy] = []
+    if a.role and a.name:
+        out.append(RoleStrategy(by="role", role=a.role, name=a.name))
+    if a.label and a.tag in ("input", "select", "textarea"):
+        out.append(LabelStrategy(by="label", text=a.label))
+    if a.tag == "input" and a.type == "submit" and a.value_attr:
+        out.append(CssStrategy(by="css", value=f'input[type="submit"][value="{a.value_attr}"]'))
+    elif a.field and a.tag in ("input", "select", "textarea"):
+        out.append(CssStrategy(by="css", value=f'{a.tag}[name="{a.field}"]'))
+    return out
 
 
 def _short(error: ValidationError) -> str:

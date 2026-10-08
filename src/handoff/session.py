@@ -50,6 +50,8 @@ class Session:
         self._control = ControlState.AUTOMATION
         self.keep_trace = False  # set True to keep the trace even when the run did not raise
         self.approvals: list[str] = []  # every approval decision this run, masked, for the result
+        self.takeovers = 0                       # human takeovers so far (bounded by settings.max_takeovers)
+        self.human_interventions: list[str] = []  # what the human did each time, masked, for the result
 
     # ------------------------------------------------------------ control
     @property

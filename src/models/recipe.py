@@ -64,6 +64,7 @@ class OutputSpec(StrictModel):
 class SuccessCheck(StrictModel):
     """Final checkpoint: how we know the whole recipe worked."""
     description: str
+    heading: str | None = None        # the final page's heading (preferred: identifies the page)
     text_visible: str | None = None
     outputs_present: list[str] = []
 
@@ -124,19 +125,39 @@ class Target(StrictModel):
 
 # ---------------------------------------------------------------- page conditions
 class PageCondition(StrictModel):
-    text_visible: str
+    """Which page we are on. Exactly one field is set.
+
+    heading is preferred: text_visible matches text ANYWHERE, and legacy apps repeat page names
+    in navigation ("Member Search" is a link on every page), so it cannot identify a page.
+    """
+    heading: str | None = None        # the page's main heading equals this
+    text_visible: str | None = None   # this text appears somewhere on the page
+
+    @model_validator(mode="after")
+    def exactly_one(self) -> "PageCondition":
+        if (self.heading is None) == (self.text_visible is None):
+            raise ValueError("page condition needs exactly one of: heading, text_visible")
+        return self
+
+    def describe(self) -> str:
+        return f'heading "{self.heading}"' if self.heading else f'text "{self.text_visible}"'
 
 
 class WaitCondition(StrictModel):
     """One thing that proves an action took effect. Exactly one field is set."""
+    heading: str | None = None
     text: str | None = None
     url_contains: str | None = None
 
     @model_validator(mode="after")
     def exactly_one(self) -> "WaitCondition":
-        if (self.text is None) == (self.url_contains is None):
-            raise ValueError("wait condition needs exactly one of: text, url_contains")
+        if sum(v is not None for v in (self.heading, self.text, self.url_contains)) != 1:
+            raise ValueError("wait condition needs exactly one of: heading, text, url_contains")
         return self
+
+    def describe(self) -> str:
+        return f'heading "{self.heading}"' if self.heading else \
+            f'text "{self.text}"' if self.text else f'url containing "{self.url_contains}"'
 
 
 class WaitFor(StrictModel):

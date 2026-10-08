@@ -6,6 +6,7 @@
   "wait_timeout_s": 10,
   "recoverable_retries": 3,
   "recovery_max_actions": 3,
+  "max_takeovers": 3,
   "headless": false,
   "llm_models": {
     "groq": "openai/gpt-oss-120b",

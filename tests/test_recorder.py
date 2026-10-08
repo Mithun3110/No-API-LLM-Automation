@@ -40,13 +40,13 @@ def test_lookup_recipe_matches_the_contract(discover_and_record):
     assert list(r.inputs) == ["member_id"] and r.inputs["member_id"].sensitive
     assert [s.action for s in r.steps] == ["navigate", "type", "click", "extract"]
     nav, typ, click, ext = r.steps
-    assert nav.url == "/search" and nav.wait_for.any_of[0].text == "Member Search"
-    assert typ.value == "{{member_id}}" and typ.expect_page.text_visible == "Member Search"
+    assert nav.url == "/search" and nav.wait_for.any_of[0].heading == "Member Search"
+    assert typ.value == "{{member_id}}" and typ.expect_page.heading == "Member Search"
     assert [type(x) for x in typ.target.strategies] == [RoleStrategy, LabelStrategy, CssStrategy]
-    assert click.wait_for.any_of[0].text == "Member Detail" and click.risk == "safe"
+    assert click.wait_for.any_of[0].heading == "Member Detail" and click.risk == "safe"
     assert [type(x) for x in ext.target.strategies] == [NearTextStrategy, CssStrategy]
     assert ext.save_as == "savings_balance" and ext.parse == "currency"
-    assert r.success_check.text_visible == "Member Detail"
+    assert r.success_check.heading == "Member Detail"
     assert {h.id for h in r.error_handlers} >= {"member_not_found", "notice_popup", "server_error"}
     assert "verified to match exactly this element" in typ.target.why
 

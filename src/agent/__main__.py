@@ -2,7 +2,8 @@
 
     python -m src.agent "Look up member 12345 and read their savings balance" [--mock] [--slow]
 
-The bank must be running on :5050. Risky clicks are rejected for now (approval prompt: step 9).
+The bank must be running on :5050. With a person at the keyboard, risky clicks ask for
+approval and being stuck hands the browser to you (type resume or abort). --no-human disables both.
 The browser stays open after the run until you press Enter (use --auto-close to skip that).
 """
 
@@ -11,7 +12,7 @@ import sys
 
 from dotenv import load_dotenv
 
-from src.handoff import open_session
+from src.handoff import TerminalOperator, open_session, reject_all
 from src.recorder import RecorderError, record
 
 from .discovery import run_discovery
@@ -25,20 +26,27 @@ def main() -> None:
     parser.add_argument("--mock", action="store_true", help="use a scripted mock LLM (no API key)")
     parser.add_argument("--slow", action="store_true", help="slow the browser down so you can watch")
     parser.add_argument("--auto-close", action="store_true", help="close the browser as soon as the run ends")
+    parser.add_argument("--no-human", action="store_true",
+                        help="no operator: reject risky steps and stop instead of handing over")
     args = parser.parse_args()
 
     load_dotenv()
-    with open_session("discover", slow_mo_ms=600 if args.slow else 0) as session:
+    # A person at the keyboard is the operator: approves risky steps and takes over when stuck.
+    operator = None if args.no_human or not sys.stdin.isatty() else TerminalOperator()
+    approver = operator.approve if operator else reject_all
+    with open_session("discover", slow_mo_ms=600 if args.slow else 0, approver=approver) as session:
         try:
             llm = load_mock(args.goal) if args.mock else make_llm(session.settings)
         except LLMError as e:
             raise SystemExit(f"error: {e}")
         print(f"[discover] model: {llm.model}")
-        result = run_discovery(session, llm, args.goal)
+        result = run_discovery(session, llm, args.goal, operator)
 
         # Report while the browser is still open, so the final page can be inspected.
         r = result.run_result
         print(f"\nResult: {r.status.value}" + (f" - {r.message}" if r.message else ""))
+        for note in r.human_interventions + r.approvals:
+            print(f"  {note}")
         for name, value in r.outputs.items():
             print(f"  {name} = {value}")  # real value for the caller; masked in the run folder
         print(f"  steps that worked: {len(result.successful_steps)} of {len(result.steps)}")
@@ -47,7 +55,8 @@ def main() -> None:
             try:
                 saved = record(result, session.logger.run_id, session.settings, session.guard,
                                session.logger.masker)
-                print(f"  recipe saved (draft): {saved.path}")
+                review = " - needs review (contains human steps)" if saved.recipe.needs_review else ""
+                print(f"  recipe saved (draft): {saved.path}{review}")
                 for note in saved.skipped:
                     print(f"    left out {note}")
             except RecorderError as e:

@@ -9,6 +9,9 @@ For each step:
   6. extract    - parse and keep declared outputs
 Then the success check.
 
+On a hard failure, if an operator is available, a human takes over the same live session.
+On resume, replay continues from the step that matches the page the human left it on.
+
 Three kinds of result, kept apart on purpose:
 - business outcome: a valid answer (e.g. MEMBER_NOT_FOUND). Stop and return the code.
 - recoverable: a known interruption (popup, slow page). Fix it, bounded by max_attempts.
@@ -26,10 +29,10 @@ import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from src.handoff import Action, ActionOutcome, Session
+from src.handoff import Action, ActionOutcome, Operator, Session, take_over
 from src.models import FailureInfo, Recipe, RunResult, RunStatus, Step
 from src.models.recipe import (
-    BusinessOutcomeHandler, ClickFix, HardFailureHandler, RecoverableHandler, WaitCondition, WaitFix,
+    BusinessOutcomeHandler, ClickFix, HardFailureHandler, PageCondition, RecoverableHandler, WaitFix,
 )
 from src.models.values import ParseError, parse_value
 
@@ -80,9 +83,35 @@ class Replayer:
         self.recoveries: list[str] = []
         self.warnings: list[str] = []
         self._attempts: dict[tuple[int, str], int] = {}  # (step, handler id) -> fixes applied
+        self._evidence: list[str] = []                    # from the latest hard failure
 
     # ------------------------------------------------------------ run
-    def run(self, start_at: int = 1) -> ReplayResult:
+    def run(self, operator: Operator | None = None, start_at: int = 1) -> ReplayResult:
+        stop = self._execute(start_at)
+        # Hard failure: hand the same live session to a human, then resume where the page is.
+        while stop.status == RunStatus.FAILED and operator is not None \
+                and self.session.takeovers < self.session.settings.max_takeovers:
+            step = self.recipe.steps[stop.step - 1] if stop.step else None
+            takeover = take_over(self.session, operator, "replay", "hard_failure",
+                                 f"{stop.error_type}: expected {stop.expected}; observed {stop.observed}",
+                                 recipe_id=self.recipe.recipe_id, recipe_version=self.recipe.version,
+                                 step=stop.step, step_description=step.description if step else None)
+            if takeover.decision == "abort":
+                stop = StepStop(RunStatus.ABORTED_BY_OPERATOR, stop.step, message="operator aborted the run")
+                break
+            resume_at = self._resume_point()
+            if resume_at is None:
+                stop = self._hard_stop(None, "a page that matches a recipe step",
+                                       f'on "{self.browser.heading() or self.browser.current_url()}"', "no_resume_point")
+                continue
+            self.log.log("replay", "resumed", self.session.control, step=resume_at,
+                         reason=f'continuing at step {resume_at} (page "{self.browser.heading()}")')
+            stop = self._execute(resume_at)
+        if stop.status == RunStatus.FAILED and self.session.takeovers:
+            stop.status = RunStatus.ESCALATED  # a human had it and it still did not finish
+        return self._finish(stop)
+
+    def _execute(self, start_at: int) -> StepStop:
         r = self.recipe
         self.log.log("replay", "started", self.session.control,
                      reason=f"{r.recipe_id}@{r.version} from step {start_at}",
@@ -92,20 +121,38 @@ class Replayer:
                 self._run_step(step)
             self._success_check()
         except StopReplay as stop:
-            return self._finish(stop.result)
-        return self._finish(StepStop(RunStatus.SUCCESS, None))
+            if stop.result.status == RunStatus.FAILED:
+                self._capture_evidence(stop.result)
+            return stop.result
+        return StepStop(RunStatus.SUCCESS, None)
+
+    def _resume_point(self) -> int | None:
+        """The step to continue at after a takeover, judged from the page the human left.
+
+        The latest step whose expect_page matches, moved back to the first of the steps
+        recorded on that same page: on a form page that means re-filling the form (type and
+        select are repeatable) rather than clicking Continue on an empty form.
+        """
+        steps = self.recipe.steps
+        for i in range(len(steps) - 1, -1, -1):
+            page = steps[i].expect_page
+            if page and self.browser.page_matches(page):
+                while i > 0 and steps[i - 1].expect_page == page:
+                    i -= 1
+                return steps[i].step
+        return None
 
     def _run_step(self, step: Step) -> None:
         n = step.step
-        if step.only_if and not self.browser.text_visible(step.only_if.text_visible):
+        if step.only_if and not self.browser.page_matches(step.only_if):
             self.log.log("replay", "skipped", self.session.control, step=n, action=step.action,
-                         reason=f'only_if "{step.only_if.text_visible}" not on the page')
+                         reason=f"only_if {step.only_if.describe()} not on the page")
             return
 
         self._check_handlers(n, phase="before")
-        if step.expect_page and not self._visible(step.expect_page.text_visible, EXPECT_PAGE_GRACE_S):
+        if step.expect_page and not self._page(step.expect_page, EXPECT_PAGE_GRACE_S):
             self._check_handlers(n, phase="before")  # an error page may explain it
-            raise self._hard(n, f'page "{step.expect_page.text_visible}" before this step',
+            raise self._hard(n, f"page with {step.expect_page.describe()} before this step",
                              f'on "{self.browser.heading() or self.browser.current_url()}"', "wrong_page")
 
         started = time.monotonic()  # the wait budget counts from the action, not after it
@@ -165,7 +212,7 @@ class Replayer:
                 continue
             # Timed out: a recoverable "wait_timed_out" handler (slow page) may allow more time.
             if not self._apply_timeout_handler(n):
-                expected = " or ".join(f'"{c.text or c.url_contains}"' for c in step.wait_for.any_of)
+                expected = " or ".join(c.describe() for c in step.wait_for.any_of)
                 raise self._hard(n, f"{expected} after {step.action}",
                                  f'still on "{self.browser.heading() or self.browser.current_url()}"',
                                  "wait_timeout")
@@ -259,32 +306,49 @@ class Replayer:
         if missing:
             raise self._hard(None, f"outputs {', '.join(check.outputs_present)}",
                              f"missing {', '.join(missing)}", "success_check")
-        if check.text_visible and not self._visible(check.text_visible, EXPECT_PAGE_GRACE_S):
-            raise self._hard(None, f'"{check.text_visible}" on the final page',
-                             f'on "{self.browser.heading()}"', "success_check")
+        for cond in (PageCondition(heading=check.heading) if check.heading else None,
+                     PageCondition(text_visible=check.text_visible) if check.text_visible else None):
+            if cond and not self._page(cond, EXPECT_PAGE_GRACE_S):
+                raise self._hard(None, f"{cond.describe()} on the final page",
+                                 f'on "{self.browser.heading()}"', "success_check")
 
-    def _visible(self, text: str, timeout_s: float) -> bool:
-        return self.browser.wait_for_any([WaitCondition(text=text)], timeout_s) is not None
+    def _page(self, condition: PageCondition, timeout_s: float) -> bool:
+        deadline = time.monotonic() + timeout_s
+        while not self.browser.page_matches(condition):
+            if time.monotonic() >= deadline:
+                return False
+            self.browser.wait(0.2)
+        return True
 
     # ------------------------------------------------------------ results
     def _hard(self, step: int | None, expected: str, observed: str, error_type: str) -> StopReplay:
-        return StopReplay(StepStop(RunStatus.FAILED, step, expected=expected, observed=observed,
-                                   error_type=error_type, message=f"hard failure: {error_type}"))
+        return StopReplay(self._hard_stop(step, expected, observed, error_type))
+
+    def _hard_stop(self, step: int | None, expected: str, observed: str, error_type: str) -> StepStop:
+        return StepStop(RunStatus.FAILED, step, expected=expected, observed=observed,
+                        error_type=error_type, message=f"hard failure: {error_type}")
+
+    def _capture_evidence(self, stop: StepStop) -> None:
+        """Richer evidence for debugging: what the page looked like, and the full trace."""
+        folder = self.log.folder
+        shot = self.browser.screenshot(folder.screenshot_path(f"step{stop.step}_failure"))
+        tree = folder.snapshot_path(f"step{stop.step}_failure")
+        tree.write_text(self.log.masker.mask_text(self.browser.snapshot()))
+        self.session.keep_trace = True
+        self._evidence = [str(shot), str(tree), str(folder.trace_path())]
 
     def _finish(self, stop: StepStop) -> ReplayResult:
         folder = self.log.folder
         common = dict(run_id=self.log.run_id, mode="replay", recipe_id=self.recipe.recipe_id,
                       recipe_version=self.recipe.version, recoveries=self.recoveries, warnings=self.warnings,
-                      approvals=list(self.session.approvals), log_file=str(folder.log_path))
+                      approvals=list(self.session.approvals),
+                      human_interventions=list(self.session.human_interventions), log_file=str(folder.log_path))
         failure = None
-        if stop.status == RunStatus.FAILED:
-            # Richer evidence for debugging: what the page looked like and a full trace.
-            shot = self.browser.screenshot(folder.screenshot_path(f"step{stop.step}_failure"))
-            tree = folder.snapshot_path(f"step{stop.step}_failure")
-            tree.write_text(self.log.masker.mask_text(self.browser.snapshot()))
-            self.session.keep_trace = True
+        if stop.status in (RunStatus.FAILED, RunStatus.ESCALATED):
+            if not self._evidence:
+                self._capture_evidence(stop)
             failure = FailureInfo(step=stop.step, expected=stop.expected, observed=stop.observed,
-                                  error_type=stop.error_type, evidence=[str(shot), str(tree), str(folder.trace_path())])
+                                  error_type=stop.error_type, evidence=self._evidence)
         result = RunResult(
             status=stop.status, outcome_code=stop.outcome_code, failure=failure,
             outputs=self.outputs if stop.status == RunStatus.SUCCESS else {},
@@ -299,8 +363,13 @@ class Replayer:
         return ReplayResult(result, failed_step=stop.step if failure else None, outputs=dict(result.outputs))
 
 
-def replay(recipe: Recipe, raw_inputs: dict[str, str], session: Session, start_at: int = 1) -> ReplayResult:
-    """Validate inputs, then run the recipe on the live session. INVALID_INPUT never touches the page."""
+def replay(recipe: Recipe, raw_inputs: dict[str, str], session: Session,
+           operator: Operator | None = None) -> ReplayResult:
+    """Validate inputs, then run the recipe on the live session. INVALID_INPUT never touches the page.
+
+    With an operator, hard failures go to human takeover on the same session (strict replay);
+    without one, they are returned as FAILED (e.g. to try bounded LLM recovery first, step 11).
+    """
     values, errors = validate_inputs(recipe, raw_inputs)
     if errors:
         result = RunResult(status=RunStatus.INVALID_INPUT, run_id=session.logger.run_id, mode="replay",
@@ -312,4 +381,4 @@ def replay(recipe: Recipe, raw_inputs: dict[str, str], session: Session, start_a
     for name, spec in recipe.inputs.items():
         if spec.sensitive and name in values:
             session.logger.masker.add_value(values[name], field=name)
-    return Replayer(recipe, session, values).run(start_at)
+    return Replayer(recipe, session, values).run(operator)
