@@ -12,6 +12,7 @@ import sys
 from dotenv import load_dotenv
 
 from src.handoff import open_session
+from src.recorder import RecorderError, record
 
 from .discovery import run_discovery
 from .llm import LLMError, make_llm
@@ -42,6 +43,15 @@ def main() -> None:
             print(f"  {name} = {value}")  # real value for the caller; masked in the run folder
         print(f"  steps that worked: {len(result.successful_steps)} of {len(result.steps)}")
         print(f"  run folder: {session.logger.folder.path}")
+        if result.outcome == "success":  # only proven paths become recipes
+            try:
+                saved = record(result, session.logger.run_id, session.settings, session.guard,
+                               session.logger.masker)
+                print(f"  recipe saved (draft): {saved.path}")
+                for note in saved.skipped:
+                    print(f"    left out {note}")
+            except RecorderError as e:
+                print(f"  recipe NOT saved: {e}")
         wait_before_closing(args.auto_close)
 
 

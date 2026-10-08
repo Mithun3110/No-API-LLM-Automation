@@ -220,6 +220,18 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
    - Adds the shared error rules from `config/app_rules.json`.
    - Saves the recipe as `draft`, version `1.0.0`, with provenance (which run created it), to `recipes/<recipe_id>@1.0.0.json`. Never stores real values.
    - If a recipe with the same id already exists, bumps the minor version of the latest one (1.0.0 -> 1.1.0) and saves a new draft file. The old file is kept and stays active until the new one is approved.
+   - Built in step 7 (`src/recorder/recorder.py`):
+     - Locators are captured DURING discovery, just before each action, while the element is on the page (`Browser.locators_for`): the agent's role+name (or near_text for extract), then label, link text, and one CSS fallback (id/name/submit value, or `td:has-text(label) + td` for values). Every candidate is kept only if it matches exactly one visible element AND it is the same element (`a === b` in the page). So every locator in a recipe was proven once.
+     - Locators containing an input value or sensitive-looking text are dropped (they would only work for this record). If none remain, recording fails.
+     - `expect_page` = the page heading before the step (equals the previous step's `wait_for` when the page changed). `wait_for` = the new heading when the heading changed. Type/select steps usually have no `wait_for`.
+     - Step 1 is always `navigate` to `settings.entry_path`.
+     - Actions on an element inside a dialog that a recoverable app rule handles (e.g. OK in "Notice") are left out, with a note.
+     - Clicks are marked `irreversible` using the same guard rule as at run time.
+     - Placeholders replace input values in `value` and `url`. A typed/navigated value that still looks sensitive after that (masker would change it) is refused: "declare it as an input". Step descriptions get `{name}` (single braces) for input values, then masking. Input/output descriptions are only masked.
+     - Inputs the steps never use are dropped. Final check before writing: no SENSITIVE input value or sensitive extracted output may appear anywhere in the file.
+     - `config/app_rules.json` holds the app identity (`CoreServ Teller` 4.2, web) plus the shared outcomes and 8 error handlers copied into every recipe.
+     - Mock scripts exist for all three flows: `lookup_savings_balance`, `open_sub_account`, `update_phone`.
+     - Part G change: update phone returns `confirmation_number` (not `confirmation_message`): the success page shows it next to a label, so it can be read with near_text; the free-text message cannot.
 
 6. Replay engine (`src/replay/`)
    - Loads a recipe and inputs. No LLM is ever called from this module.
@@ -587,7 +599,7 @@ Form errors:
 | --- | --- | --- | --- |
 | Look up savings balance | `member_id` | `savings_balance` | No |
 | Open sub-account | `member_id`, `account_type`, `initial_deposit` | `confirmation_number` | Yes, needs approval |
-| Update phone number | `member_id`, `new_phone` | `confirmation_message` | Yes, needs approval |
+| Update phone number | `member_id`, `new_phone` | `confirmation_number` (see C1.5) | Yes, needs approval |
 
 ---
 

@@ -1,0 +1,23 @@
+{
+  "description": "Scripted discovery of updating a member's phone number (data-changing: Confirm needs approval).",
+  "goal_keywords": ["phone"],
+  "goal_pattern": "member (?P<member_id>\\d{5}).*?(?P<new_phone>\\d{3}-\\d{3}-\\d{4})",
+  "calls": [
+    { "tool": "define_task", "args": {
+        "recipe_id": "member.update_phone",
+        "name": "Update member phone number",
+        "description": "Change a member's phone number.",
+        "inputs": [
+          { "name": "member_id", "description": "The member's 5-digit member ID.", "type": "string", "value": "{{member_id}}", "pattern": "^\\d{5}$", "sensitive": true },
+          { "name": "new_phone", "description": "New phone number, format 555-555-0100.", "type": "string", "value": "{{new_phone}}", "pattern": "^\\d{3}-\\d{3}-\\d{4}$", "sensitive": true } ],
+        "outputs": [ { "name": "confirmation_number", "description": "Confirmation number of the change.", "type": "string", "sensitive": false } ] } },
+    { "tool": "type_text", "args": { "name": "Member ID", "text": "{{member_id}}", "reason": "Enter the member ID." } },
+    { "tool": "click", "args": { "role": "button", "name": "Search", "reason": "Open the member." } },
+    { "tool": "click", "args": { "role": "link", "name": "Update Member Info", "reason": "Go to the update form." } },
+    { "tool": "type_text", "args": { "name": "Phone Number", "text": "{{new_phone}}", "reason": "Enter the new phone number." } },
+    { "tool": "click", "args": { "role": "button", "name": "Continue", "reason": "Review the change." } },
+    { "tool": "click", "args": { "role": "button", "name": "Confirm", "reason": "Confirm the change." } },
+    { "tool": "extract", "args": { "label": "Confirmation Number", "output": "confirmation_number", "parse": "text", "reason": "Read the confirmation number." } },
+    { "tool": "done", "args": { "success": true, "summary": "Updated the phone number." } }
+  ]
+}

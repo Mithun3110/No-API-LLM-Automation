@@ -1,0 +1,25 @@
+{
+  "description": "Scripted discovery of opening a sub-account (data-changing: Confirm needs approval).",
+  "goal_keywords": ["open"],
+  "goal_pattern": "open an? (?P<account_type>Money Market|Checking|Savings|Certificate of Deposit) account for member (?P<member_id>\\d{5}) with (?:an initial deposit of )?\\$?(?P<initial_deposit>\\d+(?:\\.\\d{2})?)",
+  "calls": [
+    { "tool": "define_task", "args": {
+        "recipe_id": "member.open_sub_account",
+        "name": "Open a sub-account",
+        "description": "Open a new sub-account of a given type for a member, with an initial deposit.",
+        "inputs": [
+          { "name": "member_id", "description": "The member's 5-digit member ID.", "type": "string", "value": "{{member_id}}", "pattern": "^\\d{5}$", "sensitive": true },
+          { "name": "account_type", "description": "Savings, Checking, Money Market or Certificate of Deposit.", "type": "string", "value": "{{account_type}}", "pattern": "^(Savings|Checking|Money Market|Certificate of Deposit)$", "sensitive": false },
+          { "name": "initial_deposit", "description": "Initial deposit in USD.", "type": "currency", "value": "{{initial_deposit}}", "pattern": "^\\d+(\\.\\d{2})?$", "sensitive": true } ],
+        "outputs": [ { "name": "confirmation_number", "description": "Confirmation number of the new account.", "type": "string", "sensitive": false } ] } },
+    { "tool": "type_text", "args": { "name": "Member ID", "text": "{{member_id}}", "reason": "Enter the member ID." } },
+    { "tool": "click", "args": { "role": "button", "name": "Search", "reason": "Open the member." } },
+    { "tool": "click", "args": { "role": "link", "name": "Open Sub-Account", "reason": "Go to the open sub-account form." } },
+    { "tool": "select_option", "args": { "name": "Account Type", "option": "{{account_type}}", "reason": "Choose the account type." } },
+    { "tool": "type_text", "args": { "name": "Initial Deposit", "text": "{{initial_deposit}}", "reason": "Enter the initial deposit." } },
+    { "tool": "click", "args": { "role": "button", "name": "Continue", "reason": "Review the new account." } },
+    { "tool": "click", "args": { "role": "button", "name": "Confirm", "reason": "Confirm opening the account." } },
+    { "tool": "extract", "args": { "label": "Confirmation Number", "output": "confirmation_number", "parse": "text", "reason": "Read the confirmation number." } },
+    { "tool": "done", "args": { "success": true, "summary": "Opened the account." } }
+  ]
+}

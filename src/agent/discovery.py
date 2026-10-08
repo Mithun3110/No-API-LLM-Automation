@@ -22,6 +22,7 @@ from pydantic import ValidationError
 from src.handoff import Action, Session
 from src.models import FailureInfo, RunResult, RunStatus
 from src.models.intervention import StopReason
+from src.models.recipe import Strategy
 from src.models.values import ParseError, parse_value
 
 from . import prompts
@@ -42,8 +43,13 @@ class AgentStep:
     status: str              # done, blocked, rejected, not_found, failed, invalid, unchanged
     message: str = ""
     url_after: str = ""
+    heading_before: str = ""
     heading_after: str = ""
     extracted: str | None = None   # extract: raw page text
+    # Captured BEFORE the action, while the element is still on the page (for the recorder):
+    locators: list[Strategy] = field(default_factory=list)  # verified, in preference order
+    in_dialog: str | None = None   # name of the dialog the element was in, e.g. "Notice"
+    value: str | None = None       # what was typed/selected, or the navigate path
 
     def history_line(self) -> str:
         args = {k: v for k, v in self.args.items() if k != "reason"}
@@ -143,10 +149,16 @@ class Discovery:
             return self._record_failure(number, tool, arguments, "invalid",
                                         f"'{args.output}' is not a declared output")
 
+        action = to_action(args, step=number)
+        browser = self.session.browser
         before = self._fingerprint()
-        outcome = self.session.perform(to_action(args, step=number))
+        heading_before = browser.heading()
+        locators, in_dialog = self._capture_locators(action)
+        outcome = self.session.perform(action)
         step = AgentStep(number, tool, arguments, outcome.status, outcome.message,
-                         url_after=self.session.browser.current_url(), heading_after=self.session.browser.heading())
+                         url_after=browser.current_url(), heading_before=heading_before,
+                         heading_after=browser.heading(), locators=locators, in_dialog=in_dialog,
+                         value=action.value if action.value is not None else action.url)
 
         if outcome.status == "rejected":
             self._add(step)
@@ -196,6 +208,16 @@ class Discovery:
         return None
 
     # ------------------------------------------------------------ helpers
+    def _capture_locators(self, action: Action) -> tuple[list[Strategy], str | None]:
+        """Read-only look at the target before acting: backup locators and dialog membership."""
+        if not action.strategies:
+            return [], None
+        b = self.session.browser
+        found = b.find(list(action.strategies))
+        if not found.found:
+            return [], None  # perform() will report not_found
+        return b.locators_for(found.element, action.strategies[0]), b.element_facts(found.element)["dialog"]
+
     def _add(self, step: AgentStep) -> None:
         self.steps.append(step)
         if step.status in ("invalid", "unchanged"):

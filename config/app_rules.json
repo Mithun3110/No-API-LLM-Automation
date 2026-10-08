@@ -1,0 +1,113 @@
+{
+  "_note": "Shared rules for the CoreServ Teller app. The recorder copies them into every recipe it saves.",
+  "app": {
+    "name": "CoreServ Teller",
+    "version": "4.2",
+    "surface": "web"
+  },
+  "outcomes": {
+    "MEMBER_NOT_FOUND": "No member has this ID.",
+    "PERMISSION_DENIED": "The signed-in user may not view this member.",
+    "ACCOUNT_ALREADY_EXISTS": "The member already has this account type.",
+    "VALIDATION_ERROR": "The app rejected a value on a form."
+  },
+  "error_handlers": [
+    {
+      "id": "member_not_found",
+      "description": "No member with that ID.",
+      "scope": "any_step",
+      "when": {
+        "text": "No member found."
+      },
+      "type": "business_outcome",
+      "result": "MEMBER_NOT_FOUND"
+    },
+    {
+      "id": "permission_denied",
+      "description": "Restricted member.",
+      "scope": "any_step",
+      "when": {
+        "text": "You are not authorized to view this account."
+      },
+      "type": "business_outcome",
+      "result": "PERMISSION_DENIED"
+    },
+    {
+      "id": "account_already_exists",
+      "description": "Duplicate account type.",
+      "scope": "any_step",
+      "when": {
+        "text": "This account already exists."
+      },
+      "type": "business_outcome",
+      "result": "ACCOUNT_ALREADY_EXISTS"
+    },
+    {
+      "id": "validation_error",
+      "description": "A form value was rejected.",
+      "scope": "any_step",
+      "when": {
+        "text": "Please correct the following:"
+      },
+      "type": "business_outcome",
+      "result": "VALIDATION_ERROR"
+    },
+    {
+      "id": "notice_popup",
+      "description": "Maintenance Notice dialog blocks the page.",
+      "scope": "any_step",
+      "when": {
+        "dialog": "Notice"
+      },
+      "type": "recoverable",
+      "fix": {
+        "action": "click",
+        "target": {
+          "strategies": [
+            {
+              "by": "role",
+              "role": "button",
+              "name": "OK"
+            }
+          ],
+          "why": "The dialog's only button."
+        }
+      },
+      "max_attempts": 3
+    },
+    {
+      "id": "slow_page",
+      "description": "The page is still loading.",
+      "scope": "any_step",
+      "when": {
+        "wait_timed_out": true
+      },
+      "type": "recoverable",
+      "fix": {
+        "action": "wait",
+        "seconds": 5
+      },
+      "max_attempts": 3
+    },
+    {
+      "id": "session_expired",
+      "description": "Signed out by the app.",
+      "scope": "any_step",
+      "when": {
+        "text": "Session expired"
+      },
+      "type": "hard_failure",
+      "then": "escalate"
+    },
+    {
+      "id": "server_error",
+      "description": "The app crashed on this request.",
+      "scope": "any_step",
+      "when": {
+        "text": "Something went wrong."
+      },
+      "type": "hard_failure",
+      "then": "escalate"
+    }
+  ]
+}

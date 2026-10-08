@@ -215,6 +215,63 @@ class Browser:
         column = anchor_cell.evaluate("cell => cell.cellIndex") + 1
         return anchor_cell.locator(f"xpath=parent::tr/following-sibling::tr[1]/*[self::td or self::th][{column}]")
 
+    # ------------------------------------------------------------ recording
+    def element_facts(self, element: Element) -> dict:
+        """Plain facts about an element, for building backup locators and for the recorder."""
+        return element._locator.evaluate("""el => {
+            const dialog = el.closest('[role=dialog]');
+            const labelled = dialog && dialog.getAttribute('aria-labelledby');
+            const label = (el.labels && el.labels.length) ? el.labels[0].innerText : el.getAttribute('aria-label');
+            return {
+                tag: el.tagName.toLowerCase(), type: el.getAttribute('type'), name: el.getAttribute('name'),
+                id: el.id || null, value: el.getAttribute('value'), label: label ? label.trim() : null,
+                text: (el.innerText || '').trim().slice(0, 80),
+                dialog: dialog ? (labelled ? document.getElementById(labelled).innerText.trim() : 'dialog') : null,
+            };
+        }""")
+
+    def locators_for(self, element: Element, primary: Strategy) -> list[Strategy]:
+        """All verified ways to find this element, in preference order: role/near_text, label, text, css.
+
+        CSS is the web-specific last resort, so it is built here in the surface layer.
+        Only one CSS fallback is kept: the first candidate that proves unique.
+        """
+        f = self.element_facts(element)
+        candidates: list[Strategy] = []
+        if f["label"] and f["tag"] in ("input", "select", "textarea"):
+            candidates.append(LabelStrategy(by="label", text=f["label"]))
+        if f["tag"] == "a" and f["text"]:
+            candidates.append(TextStrategy(by="text", text=f["text"]))
+        css: list[str] = []
+        if isinstance(primary, NearTextStrategy) and primary.relation == "right_of":
+            css.append(f"td:has-text('{primary.anchor}') + td")
+        if f["tag"] == "input" and f["type"] == "submit" and f["value"]:
+            css.append(f'input[type="submit"][value="{f["value"]}"]')
+        if f["name"] and f["tag"] in ("input", "select", "textarea"):
+            css.append(f'{f["tag"]}[name="{f["name"]}"]')
+        if f["tag"] == "button" and f["text"]:
+            css.append(f'button:has-text("{f["text"]}")')
+        verified_css = self.backup_strategies(element, [CssStrategy(by="css", value=c) for c in css])
+        return [primary] + self.backup_strategies(element, candidates) + verified_css[:1]
+
+    def backup_strategies(self, element: Element, candidates: list[Strategy]) -> list[Strategy]:
+        """Keep only candidates that match exactly one visible element, and it is THIS element.
+
+        Checked now, on the live page, so every locator in a recipe was proven to work once.
+        """
+        target = element._locator.element_handle()
+        kept = []
+        for strategy in candidates:
+            try:
+                loc = self._locate(strategy).filter(visible=True)
+                if loc.count() != 1:
+                    continue
+                if self.page.evaluate("([a, b]) => a === b", [target, loc.element_handle()]):
+                    kept.append(strategy)
+            except PlaywrightError:
+                continue  # e.g. a candidate CSS selector the page cannot parse
+        return kept
+
     # ------------------------------------------------------------ actions
     def click(self, element: Element) -> None:
         self._act(element, "click", lambda loc: loc.click())

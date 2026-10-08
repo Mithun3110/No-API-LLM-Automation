@@ -16,7 +16,11 @@ TEST_PORT = 5051  # not 5050, so tests never touch the bank you run by hand
 
 @pytest.fixture(scope="session")
 def bank_url(tmp_path_factory) -> str:
-    """Start the bank on a throwaway database, so every test session starts from the seed data."""
+    """Start the bank on a throwaway database, so every test session starts from the seed data.
+
+    One bank serves the whole test session. Tests that CHANGE data (an approved Confirm) must
+    use a member no other test relies on: 12348 (session), 23457 and 45679 (recorder).
+    """
     db_path = tmp_path_factory.mktemp("bank") / "bank.db"
     env = {**os.environ, "BANK_DB_PATH": str(db_path), "BANK_PORT": str(TEST_PORT)}
     proc = subprocess.Popen([sys.executable, "bank_app/app.py"], cwd=ROOT, env=env,
