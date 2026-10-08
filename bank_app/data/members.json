@@ -1,0 +1,1323 @@
+{
+  "_note": "Fake seed data only. No real people, accounts, or PII.",
+  "users": [
+    {
+      "username": "demo",
+      "password": "demo123",
+      "display_name": "Demo Teller",
+      "role": "teller"
+    },
+    {
+      "username": "admin",
+      "password": "admin123",
+      "display_name": "Administrator",
+      "role": "admin"
+    }
+  ],
+  "members": [
+    {
+      "member_id": "12345",
+      "name": "Alice Fernwood",
+      "address": "2625 Willow Way, Fairview, OR 97024",
+      "phone": "555-359-0127",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 16057.78,
+          "account_number": "1234501381"
+        },
+        {
+          "type": "Checking",
+          "balance": 248.84,
+          "account_number": "1234502350"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 1106.02
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -52.52
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -352.83
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Direct Deposit - Payroll",
+          "amount": 1075.45
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -676.57
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Utility Payment",
+          "amount": -1139.42
+        }
+      ]
+    },
+    {
+      "member_id": "12346",
+      "name": "Brian Okafor",
+      "address": "6237 Birch Blvd, Lakeside, CA 92040",
+      "phone": "555-573-0120",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 23938.88,
+          "account_number": "1234601199"
+        },
+        {
+          "type": "Checking",
+          "balance": 2725.93,
+          "account_number": "1234602467"
+        },
+        {
+          "type": "Money Market",
+          "balance": 4617.09,
+          "account_number": "1234603967"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 1211.66
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -1459.81
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -830.3
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Interest Payment",
+          "amount": 1058.33
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "Direct Deposit - Payroll",
+          "amount": 1160.74
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -1300.39
+        }
+      ]
+    },
+    {
+      "member_id": "12347",
+      "name": "Carmen Delgado",
+      "address": "8189 Willow Way, Lakeside, CA 92040",
+      "phone": "555-471-0117",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 9380.49,
+          "account_number": "1234701373"
+        },
+        {
+          "type": "Checking",
+          "balance": 1715.58,
+          "account_number": "1234702818"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -803.54
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 696.08
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Utility Payment",
+          "amount": -1028.5
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Direct Deposit - Payroll",
+          "amount": 1233.59
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 405.27
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Checking",
+          "description": "Transfer In",
+          "amount": 322.88
+        }
+      ]
+    },
+    {
+      "member_id": "12348",
+      "name": "David Lindqvist",
+      "address": "198 Oak Ave, Greenville, SC 29601",
+      "phone": "555-473-0198",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 6316.36,
+          "account_number": "1234801369"
+        },
+        {
+          "type": "Checking",
+          "balance": 4512.88,
+          "account_number": "1234802864"
+        },
+        {
+          "type": "Certificate of Deposit",
+          "balance": 0.0,
+          "account_number": "1234803698"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -546.18
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Grocery Store",
+          "amount": -140.91
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Direct Deposit - Payroll",
+          "amount": 233.5
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Grocery Store",
+          "amount": -896.63
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -895.85
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Checking",
+          "description": "Online Purchase",
+          "amount": -1456.76
+        }
+      ]
+    },
+    {
+      "member_id": "12399",
+      "name": "Elena Petrova",
+      "address": "5957 Birch Blvd, Riverton, WY 82501",
+      "phone": "555-446-0172",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 16095.85,
+          "account_number": "1239901545"
+        },
+        {
+          "type": "Checking",
+          "balance": 936.84,
+          "account_number": "1239902261"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -1430.95
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "Utility Payment",
+          "amount": -763.98
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -1263.3
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 564.0
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "Grocery Store",
+          "amount": -900.42
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -172.24
+        }
+      ]
+    },
+    {
+      "member_id": "23456",
+      "name": "Farid Haddad",
+      "address": "1059 Elm Ct, Springfield, IL 62701",
+      "phone": "555-767-0129",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 23684.35,
+          "account_number": "2345601170"
+        },
+        {
+          "type": "Checking",
+          "balance": 730.94,
+          "account_number": "2345602878"
+        },
+        {
+          "type": "Money Market",
+          "balance": 19953.63,
+          "account_number": "2345603645"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Grocery Store",
+          "amount": -991.33
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Grocery Store",
+          "amount": -793.87
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -1393.73
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Transfer In",
+          "amount": 601.49
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 1349.92
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -375.62
+        }
+      ]
+    },
+    {
+      "member_id": "23457",
+      "name": "Grace Nakamura",
+      "address": "7072 Elm Ct, Lakeside, CA 92040",
+      "phone": "555-678-0193",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 14793.31,
+          "account_number": "2345701824"
+        },
+        {
+          "type": "Checking",
+          "balance": 107.17,
+          "account_number": "2345702746"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Direct Deposit - Payroll",
+          "amount": 105.76
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Direct Deposit - Payroll",
+          "amount": 110.93
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "Transfer In",
+          "amount": 1005.12
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 1086.41
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -1178.01
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -146.02
+        }
+      ]
+    },
+    {
+      "member_id": "23499",
+      "name": "Hector Alvarez",
+      "address": "8866 Maple St, Springfield, IL 62701",
+      "phone": "555-442-0121",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 1543.45,
+          "account_number": "2349901761"
+        },
+        {
+          "type": "Checking",
+          "balance": 5244.97,
+          "account_number": "2349902200"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Direct Deposit - Payroll",
+          "amount": 1093.68
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -291.43
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -635.71
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Utility Payment",
+          "amount": -378.46
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -1212.99
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -979.96
+        }
+      ]
+    },
+    {
+      "member_id": "34567",
+      "name": "Irene Kowalski",
+      "address": "9581 Spruce Dr, Greenville, SC 29601",
+      "phone": "555-361-0107",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 10279.07,
+          "account_number": "3456701985"
+        },
+        {
+          "type": "Checking",
+          "balance": 3876.8,
+          "account_number": "3456702510"
+        },
+        {
+          "type": "Certificate of Deposit",
+          "balance": 0.0,
+          "account_number": "3456703160"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Grocery Store",
+          "amount": -8.22
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -1390.14
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "Online Purchase",
+          "amount": -637.4
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -288.9
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 870.87
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Checking",
+          "description": "Direct Deposit - Payroll",
+          "amount": 90.46
+        }
+      ]
+    },
+    {
+      "member_id": "34568",
+      "name": "Jamal Washington",
+      "address": "1198 Maple St, Lakeside, CA 92040",
+      "phone": "555-776-0112",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 24027.32,
+          "account_number": "3456801709"
+        },
+        {
+          "type": "Checking",
+          "balance": 686.89,
+          "account_number": "3456802169"
+        },
+        {
+          "type": "Money Market",
+          "balance": 8247.17,
+          "account_number": "3456803791"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Transfer In",
+          "amount": 184.23
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 930.98
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -1402.39
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Transfer In",
+          "amount": 361.84
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -1009.18
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Checking",
+          "description": "Utility Payment",
+          "amount": -477.68
+        }
+      ]
+    },
+    {
+      "member_id": "45678",
+      "name": "Kira Thompson",
+      "address": "9919 Cedar Ln, Fairview, OR 97024",
+      "phone": "555-903-0181",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 2016.87,
+          "account_number": "4567801371"
+        },
+        {
+          "type": "Checking",
+          "balance": 1744.58,
+          "account_number": "4567802235"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Interest Payment",
+          "amount": 1319.51
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 240.83
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Utility Payment",
+          "amount": -1003.46
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Utility Payment",
+          "amount": -1408.7
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Grocery Store",
+          "amount": -177.57
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -412.16
+        }
+      ]
+    },
+    {
+      "member_id": "45679",
+      "name": "Liam O'Connell",
+      "address": "9553 Pine Rd, Lakeside, CA 92040",
+      "phone": "555-242-0139",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 21352.24,
+          "account_number": "4567901357"
+        },
+        {
+          "type": "Checking",
+          "balance": 4068.0,
+          "account_number": "4567902966"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Direct Deposit - Payroll",
+          "amount": 953.26
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "Utility Payment",
+          "amount": -10.3
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "Grocery Store",
+          "amount": -246.57
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Online Purchase",
+          "amount": -843.56
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -1417.85
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Grocery Store",
+          "amount": -1252.72
+        }
+      ]
+    },
+    {
+      "member_id": "56789",
+      "name": "Maya Patel",
+      "address": "4075 Birch Blvd, Riverton, WY 82501",
+      "phone": "555-310-0148",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 9243.36,
+          "account_number": "5678901981"
+        },
+        {
+          "type": "Checking",
+          "balance": 7468.05,
+          "account_number": "5678902140"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Interest Payment",
+          "amount": 1024.69
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -1171.27
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -1389.02
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 1464.43
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Grocery Store",
+          "amount": -42.06
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 1204.34
+        }
+      ]
+    },
+    {
+      "member_id": "56790",
+      "name": "Nathan Brooks",
+      "address": "7129 Elm Ct, Fairview, OR 97024",
+      "phone": "555-820-0165",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 21829.74,
+          "account_number": "5679001936"
+        },
+        {
+          "type": "Checking",
+          "balance": 6875.82,
+          "account_number": "5679002571"
+        },
+        {
+          "type": "Money Market",
+          "balance": 9674.91,
+          "account_number": "5679003458"
+        },
+        {
+          "type": "Certificate of Deposit",
+          "balance": 0.0,
+          "account_number": "5679004412"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 40.38
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Transfer In",
+          "amount": 495.75
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -529.96
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -1409.16
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -271.96
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Utility Payment",
+          "amount": -167.06
+        }
+      ]
+    },
+    {
+      "member_id": "67890",
+      "name": "Olivia Chen",
+      "address": "6221 Pine Rd, Greenville, SC 29601",
+      "phone": "555-508-0151",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 3068.02,
+          "account_number": "6789001294"
+        },
+        {
+          "type": "Checking",
+          "balance": 7201.06,
+          "account_number": "6789002360"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Direct Deposit - Payroll",
+          "amount": 7.53
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Transfer In",
+          "amount": 649.79
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 996.76
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -763.15
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -606.59
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Utility Payment",
+          "amount": -291.8
+        }
+      ]
+    },
+    {
+      "member_id": "11223",
+      "name": "Pedro Santos",
+      "address": "4021 Spruce Dr, Greenville, SC 29601",
+      "phone": "555-274-0158",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 13788.84,
+          "account_number": "1122301393"
+        },
+        {
+          "type": "Checking",
+          "balance": 53.23,
+          "account_number": "1122302315"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -700.16
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -769.21
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Grocery Store",
+          "amount": -429.26
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Interest Payment",
+          "amount": 1228.54
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Transfer In",
+          "amount": 340.84
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 41.52
+        }
+      ]
+    },
+    {
+      "member_id": "20481",
+      "name": "Quinn Harper",
+      "address": "7261 Willow Way, Greenville, SC 29601",
+      "phone": "555-362-0195",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 10478.14,
+          "account_number": "2048101299"
+        },
+        {
+          "type": "Checking",
+          "balance": 5056.63,
+          "account_number": "2048102835"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -602.48
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "Grocery Store",
+          "amount": -1339.53
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -332.17
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -838.32
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -204.34
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Checking",
+          "description": "Online Purchase",
+          "amount": -1425.31
+        }
+      ]
+    },
+    {
+      "member_id": "31415",
+      "name": "Rosa Martinez",
+      "address": "8900 Spruce Dr, Lakeside, CA 92040",
+      "phone": "555-411-0153",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 21565.07,
+          "account_number": "3141501960"
+        },
+        {
+          "type": "Checking",
+          "balance": 3628.05,
+          "account_number": "3141502752"
+        },
+        {
+          "type": "Money Market",
+          "balance": 30319.29,
+          "account_number": "3141503383"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -415.52
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -355.57
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 1340.08
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -230.49
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -1061.1
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Checking",
+          "description": "ATM Withdrawal",
+          "amount": -614.36
+        }
+      ]
+    },
+    {
+      "member_id": "40404",
+      "name": "Samuel Adeyemi",
+      "address": "2101 Maple St, Lakeside, CA 92040",
+      "phone": "555-777-0184",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 9859.02,
+          "account_number": "4040401812"
+        },
+        {
+          "type": "Checking",
+          "balance": 6169.88,
+          "account_number": "4040402120"
+        },
+        {
+          "type": "Certificate of Deposit",
+          "balance": 0.0,
+          "account_number": "4040403977"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -13.81
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 1131.45
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -734.9
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Utility Payment",
+          "amount": -731.03
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -1004.97
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -1261.56
+        }
+      ]
+    },
+    {
+      "member_id": "58213",
+      "name": "Tara Novak",
+      "address": "863 Elm Ct, Riverton, WY 82501",
+      "phone": "555-270-0199",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 872.13,
+          "account_number": "5821301238"
+        },
+        {
+          "type": "Checking",
+          "balance": 5159.86,
+          "account_number": "5821302987"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -80.18
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -321.43
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 1143.04
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -1129.25
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -1253.19
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -1124.79
+        }
+      ]
+    },
+    {
+      "member_id": "77777",
+      "name": "Restricted Member",
+      "address": "9443 Willow Way, Lakeside, CA 92040",
+      "phone": "555-403-0109",
+      "restricted": true,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 23940.68,
+          "account_number": "7777701131"
+        },
+        {
+          "type": "Checking",
+          "balance": 370.05,
+          "account_number": "7777702353"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 933.9
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Savings",
+          "description": "Transfer In",
+          "amount": 712.97
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -700.23
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Checking",
+          "description": "Utility Payment",
+          "amount": -255.84
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -1447.26
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -1393.69
+        }
+      ]
+    },
+    {
+      "member_id": "88120",
+      "name": "Victor Huang",
+      "address": "4435 Spruce Dr, Lakeside, CA 92040",
+      "phone": "555-948-0175",
+      "restricted": false,
+      "accounts": [
+        {
+          "type": "Savings",
+          "balance": 14884.03,
+          "account_number": "8812001813"
+        },
+        {
+          "type": "Checking",
+          "balance": 6653.04,
+          "account_number": "8812002891"
+        },
+        {
+          "type": "Money Market",
+          "balance": 10471.13,
+          "account_number": "8812003408"
+        }
+      ],
+      "transactions": [
+        {
+          "date": "2026-09-02",
+          "account_type": "Savings",
+          "description": "ATM Withdrawal",
+          "amount": -524.07
+        },
+        {
+          "date": "2026-09-07",
+          "account_type": "Checking",
+          "description": "Check #1042",
+          "amount": -108.09
+        },
+        {
+          "date": "2026-09-12",
+          "account_type": "Savings",
+          "description": "Interest Payment",
+          "amount": 1275.12
+        },
+        {
+          "date": "2026-09-17",
+          "account_type": "Savings",
+          "description": "Online Purchase",
+          "amount": -653.12
+        },
+        {
+          "date": "2026-09-22",
+          "account_type": "Checking",
+          "description": "Interest Payment",
+          "amount": 1062.43
+        },
+        {
+          "date": "2026-09-27",
+          "account_type": "Savings",
+          "description": "Check #1042",
+          "amount": -1102.02
+        }
+      ]
+    }
+  ]
+}

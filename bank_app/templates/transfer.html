@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Transfer Funds{% endblock %}
+{% block content %}
+{% include "_member_header.html" %}
+<h2><font face="Verdana">Transfer Funds</font></h2>
+{% include "_errors.html" %}
+<form method="post" action="{{ url_for('transfer', member_id=m.member_id) }}">
+<table border="0" cellpadding="4">
+  <tr><td><font face="Verdana" size="2"><label for="f1">From Account</label></font></td>
+      <td><select name="f1" id="f1"><option value="">-- Select --</option>
+        {% for a in accounts %}<option value="{{ a.id }}" {% if form.from == a.id|string %}selected{% endif %}>{{ a.type }} {{ a.account_number|mask_account }} ({{ a.balance_cents|money }})</option>{% endfor %}
+      </select></td></tr>
+  <tr><td><font face="Verdana" size="2"><label for="f2">To Account</label></font></td>
+      <td><select name="f2" id="f2"><option value="">-- Select --</option>
+        {% for a in accounts %}<option value="{{ a.id }}" {% if form.to == a.id|string %}selected{% endif %}>{{ a.type }} {{ a.account_number|mask_account }} ({{ a.balance_cents|money }})</option>{% endfor %}
+      </select></td></tr>
+  <!-- Weak label on purpose: "Amt" is plain text, not linked to the input. -->
+  <tr><td><font face="Verdana" size="2">Amt</font></td>
+      <td><font face="Verdana" size="2">$</font><input type="text" name="f3" size="12" value="{{ form.amount }}"></td></tr>
+  <tr><td></td><td><input type="submit" value="Continue"></td></tr>
+</table>
+</form>
+{% endblock %}

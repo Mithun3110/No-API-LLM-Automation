@@ -1,0 +1,7 @@
+{% if errors %}
+<table width="100%" border="1" bordercolor="#cc0000" cellpadding="4" cellspacing="0" role="alert">
+  <tr><td bgcolor="#ffeeee"><font face="Verdana" size="2" class="err"><b>Please correct the following:</b>
+    {% for e in errors %}<br>&bull; {{ e }}{% endfor %}
+  </font></td></tr>
+</table><br>
+{% endif %}

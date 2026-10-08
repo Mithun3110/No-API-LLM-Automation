@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Member Search{% endblock %}
+{% block content %}
+<h2><font face="Verdana">Member Search</font></h2>
+{% if error %}<p role="alert"><font face="Verdana" size="2" class="err"><b>{{ error }}</b></font></p>{% endif %}
+<form method="get" action="{{ url_for('search') }}">
+<table border="0" cellpadding="4">
+  <tr><td><font face="Verdana" size="2"><label for="f1">Member ID</label></font></td>
+      <td><input type="text" name="f1" id="f1" size="10" maxlength="5" value="{{ query or '' }}"></td>
+      <td><input type="submit" value="Search"></td></tr>
+</table>
+</form>
+<font face="Verdana" size="1" color="#555555">Enter a full 5-digit Member ID, or the first digits to list matches.</font>
+{% endblock %}

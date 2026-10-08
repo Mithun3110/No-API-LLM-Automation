@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{{ app_name }} - {% block title %}{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body bgcolor="#d4d0c8">
+<!-- Legacy layout on purpose: nested tables, <font>, no test IDs. -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td bgcolor="#003366" height="40">
+      <font face="Verdana" size="4" color="#ffffff">&nbsp;<b>{{ app_name }}</b></font>
+      <font face="Verdana" size="1" color="#99ccff">&nbsp;Member Services Console</font>
+    </td>
+    <td bgcolor="#003366" align="right">
+      {% if user %}
+      <font face="Verdana" size="1" color="#ffffff">{{ 'Admin' if role == 'admin' else 'Teller' }}: {{ user }}&nbsp;|&nbsp;</font>
+      <a href="{{ url_for('search') }}"><font face="Verdana" size="1" color="#ffff99">Member Search</font></a>
+      <font color="#ffffff">|</font>
+      <a href="{{ url_for('logout') }}"><font face="Verdana" size="1" color="#ffff99">Log Off</font></a>&nbsp;
+      {% endif %}
+    </td>
+  </tr>
+</table>
+<table width="100%" cellpadding="8" cellspacing="0" border="0">
+  <tr><td valign="top">
+    <table width="760" bgcolor="#ffffff" border="1" cellpadding="6" cellspacing="0" bordercolor="#808080">
+      <tr><td>
+        {% block content %}{% endblock %}
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+<table width="100%"><tr><td align="center">
+  <font face="Verdana" size="1" color="#555555">{{ app_name }} v{{ app_version }} &copy; 1999-2026 Fictional Credit Union Systems. Authorized use only.</font>
+</td></tr></table>
+
+{% if show_notice %}
+<!-- Injected "Notice" dialog. The overlay covers the page, so nothing else can be
+     clicked until OK is pressed, like a real modal in a legacy app. -->
+<div class="overlay" id="notice-overlay">
+  <div class="notice" role="dialog" aria-modal="true" aria-labelledby="notice-title">
+    <table width="100%" cellpadding="4" cellspacing="0">
+      <tr><td bgcolor="#000080"><font face="Verdana" size="2" color="#ffffff"><b id="notice-title">Notice</b></font></td></tr>
+      <tr><td><font face="Verdana" size="2">System maintenance is scheduled tonight from 11:00 PM to 1:00 AM. Please save your work.</font></td></tr>
+      <tr><td align="center"><button type="button" onclick="document.getElementById('notice-overlay').remove()">OK</button></td></tr>
+    </table>
+  </div>
+</div>
+{% endif %}
+</body>
+</html>

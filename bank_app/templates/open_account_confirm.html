@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Confirm New Account{% endblock %}
+{% block content %}
+{% include "_member_header.html" %}
+<h2><font face="Verdana">Confirm New Account</font></h2>
+<font face="Verdana" size="2">Please review. This will open a new account for the member.</font><br><br>
+<table border="1" cellpadding="4" cellspacing="0" bordercolor="#808080">
+  <tr><td><font face="Verdana" size="2"><b>Account Type</b></font></td><td><font face="Verdana" size="2">{{ type }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>Initial Deposit</b></font></td><td><font face="Verdana" size="2">{{ deposit|money }}</font></td></tr>
+</table><br>
+<form method="post" action="{{ url_for('open_account_confirm', member_id=m.member_id) }}">
+  <input type="hidden" name="f1" value="{{ type }}">
+  <input type="hidden" name="f2" value="{{ '%.2f'|format(deposit / 100) }}">
+  <input type="submit" value="Confirm">
+  &nbsp;<font face="Verdana" size="2"><a href="{{ url_for('member_detail', member_id=m.member_id) }}">Cancel</a></font>
+</form>
+{% endblock %}

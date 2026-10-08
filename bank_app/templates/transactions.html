@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Transaction History{% endblock %}
+{% block content %}
+{% include "_member_header.html" %}
+<h2><font face="Verdana">Transaction History</font></h2>
+<table border="1" cellpadding="4" cellspacing="0" bordercolor="#808080" width="100%">
+  <tr bgcolor="#003366">
+    <td><font face="Verdana" size="1" color="#ffffff"><b>Date</b></font></td>
+    <td><font face="Verdana" size="1" color="#ffffff"><b>Account</b></font></td>
+    <td><font face="Verdana" size="1" color="#ffffff"><b>Description</b></font></td>
+    <td><font face="Verdana" size="1" color="#ffffff"><b>Amount</b></font></td>
+  </tr>
+  {% for t in rows %}
+  <tr bgcolor="{{ loop.cycle('#ffffff', '#eeeeee') }}">
+    <td><font face="Verdana" size="2">{{ t.date }}</font></td>
+    <td><font face="Verdana" size="2">{{ t.type }} {{ t.account_number|mask_account }}</font></td>
+    <td><font face="Verdana" size="2">{{ t.description }}</font></td>
+    <td align="right"><font face="Verdana" size="2">{{ t.amount_cents|money }}</font></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4"><font face="Verdana" size="2">No transactions.</font></td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Access Denied{% endblock %}
+{% block content %}
+<h2><font face="Verdana">Access Denied</font></h2>
+<p role="alert"><font face="Verdana" size="2" class="err"><b>You are not authorized to view this account.</b></font></p>
+<font face="Verdana" size="2"><a href="{{ url_for('search') }}">Return to Member Search</a></font>
+{% endblock %}

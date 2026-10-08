@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Transaction Complete{% endblock %}
+{% block content %}
+{% include "_member_header.html" %}
+<h2><font face="Verdana">Transaction Complete</font></h2>
+<font face="Verdana" size="2" color="#006600"><b>{{ message }}</b></font><br><br>
+<table border="1" cellpadding="4" cellspacing="0" bordercolor="#808080">
+  <tr><td><font face="Verdana" size="2"><b>Confirmation Number</b></font></td>
+      <td><font face="Verdana" size="2">{{ confirmation }}</font></td></tr>
+</table>
+{% endblock %}

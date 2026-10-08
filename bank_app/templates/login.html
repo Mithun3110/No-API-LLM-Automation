@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Sign On{% endblock %}
+{% block content %}
+<h2><font face="Verdana">Teller Sign On</font></h2>
+{% if expired %}<p role="alert"><font face="Verdana" size="2" class="err"><b>Session expired. Please sign on again.</b></font></p>{% endif %}
+{% if error %}<p role="alert"><font face="Verdana" size="2" class="err"><b>{{ error }}</b></font></p>{% endif %}
+<form method="post" action="{{ url_for('login') }}">
+<table border="0" cellpadding="4">
+  <tr><td><font face="Verdana" size="2"><label for="f1">User ID</label></font></td>
+      <td><input type="text" name="f1" id="f1" size="20" autocomplete="off"></td></tr>
+  <tr><td><font face="Verdana" size="2"><label for="f2">Password</label></font></td>
+      <td><input type="password" name="f2" id="f2" size="20"></td></tr>
+  <tr><td></td><td><input type="submit" value="Sign On"></td></tr>
+</table>
+</form>
+<font face="Verdana" size="1" color="#555555">Demo environment. Fictional data only.</font>
+{% endblock %}

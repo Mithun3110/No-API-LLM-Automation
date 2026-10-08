@@ -15,3 +15,6 @@ docs/
 
 # macOS
 .DS_Store
+
+# Generated fake-bank database (rebuilt from bank_app/data/members.json)
+bank_app/data/bank.db

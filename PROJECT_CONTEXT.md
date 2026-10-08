@@ -123,6 +123,7 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
 | Machine | macOS | Developer's machine |
 | Language | Python 3 | One language for everything; best AI and automation libraries |
 | Target app | Fake bank website built with Flask | Same language; tiny; easy to inject errors; server-rendered HTML like legacy apps |
+| Bank data store | SQLite (built-in `sqlite3`, plain SQL, no ORM), seeded from `members.json` on first start; money stored as integer cents; data changes use transactions | Looks like a real back-office system; every query is visible and explainable |
 | Website style | Slightly messy legacy: table layouts, no test IDs, non-semantic names like `f1` | Matches the "no clean DOM" reality |
 | Automation program | Plain Python, one program, terminal commands | Assignment says not to build infrastructure |
 | Browser control | Playwright (Chromium), visible window | Accessibility tree, role-based locators, screenshots, traces; human can use the same window |
@@ -498,11 +499,15 @@ BANK_PASSWORD=demo123
 ### F1. Basics
 - Flask, server-rendered HTML with Jinja templates, runs on `http://localhost:5050`.
 - Legacy style: table layouts, nested tables, `<font>`-style plain markup, no `data-testid`, non-semantic input names like `f1`, `f2`. Labels should still be real text next to inputs so the accessibility tree has names (most, not all: one or two inputs may have weak labels to exercise backup locators).
-- Fake login: username `demo`, password `demo123`. Session cookie.
-- Data in `bank_app/data/members.json`, loaded into memory; changes are kept in memory (resetting on restart is fine).
+- Fake logins (session cookie):
+  - `demo` / `demo123`, role `teller`: account numbers and phones are masked on screen; restricted members are denied. This is the ONLY account the automation uses (`.env`).
+  - `admin` / `admin123`, role `admin`: sees full account numbers and phones, and can open restricted members. For manual inspection only; never put in `.env` or used by automation (least privilege).
+- Data in SQLite at `bank_app/data/bank.db` (git-ignored, generated). `bank_app/db.py` creates the tables and seeds them from `bank_app/data/members.json` (committed, readable seed) when the database file does not exist. Changes persist across restarts. No reset command: delete `bank.db` to start fresh.
+- Tables: `users`, `members`, `accounts`, `transactions`, `confirmations`. Money is stored as integer cents. Writes that change data (open, update, close, transfer) run inside a single transaction.
+- The automation never touches the database; it only drives the web pages.
 
 ### F2. Fake data
-8 to 10 members with 5-digit IDs, e.g. `12345`, `12346`, `12399`, `23456`, `34567`. Each has: name, address, phone, savings balance, checking balance, list of sub-accounts, and recent transactions. Several IDs share a prefix (e.g. `123xx`) so partial search returns a list.
+At least 20 members with 5-digit IDs, e.g. `12345`, `12346`, `12399`, `23456`, `34567`. Each has: name, address, phone, savings balance, checking balance, list of sub-accounts, and recent transactions. Several IDs share a prefix (e.g. `123xx`) so partial search returns a list.
 
 ### F3. Pages
 1. Login.
@@ -554,7 +559,8 @@ bank_app/
   app.py
   templates/
   static/
-  data/members.json
+  db.py
+  data/members.json   (seed; bank.db is generated and git-ignored)
 src/
   browser/       Playwright wrapper (the surface seam)
   agent/         discovery loop, LLM client, mock LLM

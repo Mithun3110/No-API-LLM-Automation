@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Member Detail{% endblock %}
+{% block content %}
+<h2><font face="Verdana">Member Detail</font></h2>
+<table border="0" cellpadding="3" width="100%">
+  <tr><td width="160"><font face="Verdana" size="2"><b>Name:</b></font></td><td><font face="Verdana" size="2">{{ m.name }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>Member ID:</b></font></td><td><font face="Verdana" size="2">{{ m.member_id }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>Address:</b></font></td><td><font face="Verdana" size="2">{{ m.address }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>Phone:</b></font></td><td><font face="Verdana" size="2">{{ m.phone|mask_phone }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>Savings Balance:</b></font></td>
+      <td><font face="Verdana" size="2">{{ savings.balance_cents|money if savings else 'N/A' }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>Checking Balance:</b></font></td>
+      <td><font face="Verdana" size="2">{{ checking.balance_cents|money if checking else 'N/A' }}</font></td></tr>
+</table>
+<br>
+<font face="Verdana" size="2"><b>Accounts</b></font>
+<table border="1" cellpadding="4" cellspacing="0" bordercolor="#808080" width="100%">
+  <tr bgcolor="#003366">
+    <td><font face="Verdana" size="1" color="#ffffff"><b>Type</b></font></td>
+    <td><font face="Verdana" size="1" color="#ffffff"><b>Account</b></font></td>
+    <td><font face="Verdana" size="1" color="#ffffff"><b>Balance</b></font></td>
+    <td><font face="Verdana" size="1" color="#ffffff"><b>Status</b></font></td>
+    <td></td>
+  </tr>
+  {% for a in accounts %}
+  <tr>
+    <td><font face="Verdana" size="2">{{ a.type }}</font></td>
+    <td><font face="Verdana" size="2">{{ a.account_number|mask_account }}</font></td>
+    <td align="right"><font face="Verdana" size="2">{{ a.balance_cents|money }}</font></td>
+    <td><font face="Verdana" size="2">{{ a.status }}</font></td>
+    <td>{% if a.status == 'Open' %}<font face="Verdana" size="1"><a href="{{ url_for('close_account', member_id=m.member_id, account_id=a.id) }}">Close</a></font>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+<br>
+<table cellpadding="4"><tr>
+  <td><font face="Verdana" size="2">[<a href="{{ url_for('transactions', member_id=m.member_id) }}">Transaction History</a>]</font></td>
+  <td><font face="Verdana" size="2">[<a href="{{ url_for('open_account', member_id=m.member_id) }}">Open Sub-Account</a>]</font></td>
+  <td><font face="Verdana" size="2">[<a href="{{ url_for('update_member', member_id=m.member_id) }}">Update Member Info</a>]</font></td>
+  <td><font face="Verdana" size="2">[<a href="{{ url_for('transfer', member_id=m.member_id) }}">Transfer Funds</a>]</font></td>
+</tr></table>
+{% endblock %}

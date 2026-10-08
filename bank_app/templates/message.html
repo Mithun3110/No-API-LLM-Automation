@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h2><font face="Verdana">{{ title }}</font></h2>
+<font face="Verdana" size="2">{{ text }}</font><br><br>
+<font face="Verdana" size="2"><a href="{{ url_for('search') }}">Return to Member Search</a></font>
+{% endblock %}

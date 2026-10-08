@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Confirm Transfer{% endblock %}
+{% block content %}
+{% include "_member_header.html" %}
+<h2><font face="Verdana">Confirm Transfer</font></h2>
+<table border="1" cellpadding="4" cellspacing="0" bordercolor="#808080">
+  <tr><td><font face="Verdana" size="2"><b>From</b></font></td><td><font face="Verdana" size="2">{{ src.type }} {{ src.account_number|mask_account }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>To</b></font></td><td><font face="Verdana" size="2">{{ dst.type }} {{ dst.account_number|mask_account }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>Amount</b></font></td><td><font face="Verdana" size="2">{{ amount|money }}</font></td></tr>
+</table><br>
+<form method="post" action="{{ url_for('transfer_confirm', member_id=m.member_id) }}">
+  <input type="hidden" name="f1" value="{{ src.id }}">
+  <input type="hidden" name="f2" value="{{ dst.id }}">
+  <input type="hidden" name="f3" value="{{ '%.2f'|format(amount / 100) }}">
+  <input type="submit" value="Transfer">
+  &nbsp;<font face="Verdana" size="2"><a href="{{ url_for('member_detail', member_id=m.member_id) }}">Cancel</a></font>
+</form>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Update Member Info{% endblock %}
+{% block content %}
+{% include "_member_header.html" %}
+<h2><font face="Verdana">Update Member Info</font></h2>
+{% include "_errors.html" %}
+<form method="post" action="{{ url_for('update_member', member_id=m.member_id) }}">
+<table border="0" cellpadding="4">
+  <tr><td><font face="Verdana" size="2"><label for="f1">Phone Number</label></font></td>
+      <td><input type="text" name="f1" id="f1" size="16" value="{{ form.phone }}"></td></tr>
+  <!-- Weak label on purpose: text in a separate cell, not linked to the input. -->
+  <tr><td valign="top"><font face="Verdana" size="2">Mailing Addr.</font></td>
+      <td><textarea name="f2" rows="2" cols="40">{{ form.address }}</textarea></td></tr>
+  <tr><td></td><td><input type="submit" value="Continue"></td></tr>
+</table>
+</form>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Confirm Member Update{% endblock %}
+{% block content %}
+{% include "_member_header.html" %}
+<h2><font face="Verdana">Confirm Member Update</font></h2>
+<font face="Verdana" size="2">Please review the new contact information.</font><br><br>
+<table border="1" cellpadding="4" cellspacing="0" bordercolor="#808080">
+  <tr><td><font face="Verdana" size="2"><b>New Phone</b></font></td><td><font face="Verdana" size="2">{{ form.phone }}</font></td></tr>
+  <tr><td><font face="Verdana" size="2"><b>New Address</b></font></td><td><font face="Verdana" size="2">{{ form.address }}</font></td></tr>
+</table><br>
+<form method="post" action="{{ url_for('update_member_confirm', member_id=m.member_id) }}">
+  <input type="hidden" name="f1" value="{{ form.phone }}">
+  <input type="hidden" name="f2" value="{{ form.address }}">
+  <input type="submit" value="Confirm">
+  &nbsp;<font face="Verdana" size="2"><a href="{{ url_for('member_detail', member_id=m.member_id) }}">Cancel</a></font>
+</form>
+{% endblock %}
