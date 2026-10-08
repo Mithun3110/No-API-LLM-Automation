@@ -413,6 +413,14 @@ Real recipes use real booleans and numbers, not quoted placeholders.
 }
 ```
 
+Schema source of truth: `src/models/recipe.py` (Pydantic). The template above is a summary; additions made in step 2:
+- `url` on `navigate` steps (path relative to the entry URL's origin). Navigate needs a destination.
+- `near_text` locator strategy: `{ "by": "near_text", "anchor": "Savings Balance:", "relation": "right_of" }`. Finds the element next to a stable label. Needed for `extract`, because the value itself changes per member and cannot be the locator.
+- `exact` on role strategies (default true), so "Search" does not also match "Member Search".
+- `wait_for` conditions may be `{ "text": ... }` or `{ "url_contains": ... }`.
+- Validation rules (all tested in `tests/test_models.py`): unknown fields rejected; steps numbered 1..n; every `{{placeholder}}` is a declared input and every input is used; every output is produced by exactly one extract step; business outcome codes must be declared in `outcomes`; `outcomes` includes SUCCESS; handler scopes point at real steps; handler ids unique; CSS may only be the last strategy; no coordinate strategies; `default_on_unknown` is always hard_failure.
+- Example recipe: `tests/fixtures/member.lookup_savings_balance@1.0.0.json` (hand-written against the real bank pages).
+
 Step field notes:
 - `source`: `agent` if the discovery agent performed the step, `human` if the operator did it during a takeover. Any `human` step means the recipe is saved with `needs_review: true`.
 - `expect_page` (optional): checked before the step runs during replay, so a wrong page is caught early. Also used to pick the resume point after a human takeover (the latest step whose `expect_page` matches). The recorder fills it from the previous step's `wait_for`, or the page heading for step 1.
@@ -429,7 +437,8 @@ Locator rules:
 
 ```json
 {
-  "status": "SUCCESS | BUSINESS_OUTCOME | FAILED | ESCALATED | ABORTED_BY_OPERATOR | REJECTED_BY_OPERATOR | NO_MATCHING_RECIPE | INVALID_INPUT",
+  "status": "SUCCESS | BUSINESS_OUTCOME | FAILED | ESCALATED | ABORTED_BY_OPERATOR | REJECTED_BY_OPERATOR | NO_MATCHING_RECIPE | INVALID_INPUT | DRAFT_NOT_ALLOWED",
+  "message": "<one readable line, e.g. why the input was invalid>",
   "run_id": "<id>",
   "mode": "<ask | replay | discover>",
   "recipe_id": "<recipe id>",
@@ -451,6 +460,8 @@ Locator rules:
   "log_file": "<path>"
 }
 ```
+
+Consistency rules (enforced in `src/models/result.py`): SUCCESS has no failure or outcome_code; BUSINESS_OUTCOME needs outcome_code; FAILED and ESCALATED need failure; only SUCCESS returns outputs. Currency outputs are `Decimal`, never float.
 
 Note: outputs are returned to the caller in the terminal. Sensitive outputs are masked in log files but shown to the caller in the result.
 

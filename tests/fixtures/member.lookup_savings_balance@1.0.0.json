@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0",
+  "recipe_id": "member.lookup_savings_balance",
+  "name": "Look up member savings balance",
+  "description": "Search for a member by 5-digit ID and read their current savings balance.",
+  "version": "1.0.0",
+  "status": "draft",
+  "needs_review": false,
+  "app": { "name": "CoreServ Teller", "version": "4.2", "surface": "web", "entry_url": "http://localhost:5050/search" },
+  "provenance": { "recorded_from_run": "hand-written-example", "recorded_at": "2026-10-08T00:00:00Z" },
+
+  "inputs": {
+    "member_id": {
+      "description": "The member's 5-digit member ID.",
+      "type": "string",
+      "pattern": "^\\d{5}$",
+      "required": true,
+      "sensitive": true
+    }
+  },
+
+  "outputs": {
+    "savings_balance": {
+      "description": "Current savings balance in USD.",
+      "type": "currency",
+      "sensitive": true
+    }
+  },
+
+  "outcomes": {
+    "SUCCESS": "The savings balance was read.",
+    "MEMBER_NOT_FOUND": "No member has this ID.",
+    "PERMISSION_DENIED": "The signed-in user may not view this member.",
+    "ACCOUNT_ALREADY_EXISTS": "The member already has this account type.",
+    "VALIDATION_ERROR": "The app rejected a value on a form."
+  },
+
+  "steps": [
+    {
+      "step": 1,
+      "description": "Open the Member Search page.",
+      "source": "agent",
+      "action": "navigate",
+      "url": "/search",
+      "risk": "safe",
+      "wait_for": { "any_of": [ { "text": "Member Search" } ] }
+    },
+    {
+      "step": 2,
+      "description": "Type the member ID into the Member ID box.",
+      "source": "agent",
+      "expect_page": { "text_visible": "Member Search" },
+      "action": "type",
+      "target": {
+        "strategies": [
+          { "by": "role", "role": "textbox", "name": "Member ID" },
+          { "by": "label", "text": "Member ID" },
+          { "by": "css", "value": "input[name=f1]" }
+        ],
+        "why": "The textbox has a real <label> 'Member ID', so role+name and label survive layout changes. The input name f1 is meaningless and only a last resort."
+      },
+      "value": "{{member_id}}",
+      "risk": "safe"
+    },
+    {
+      "step": 3,
+      "description": "Click Search to open the member.",
+      "source": "agent",
+      "expect_page": { "text_visible": "Member Search" },
+      "action": "click",
+      "target": {
+        "strategies": [
+          { "by": "role", "role": "button", "name": "Search" },
+          { "by": "css", "value": "input[type=submit][value=Search]" }
+        ],
+        "why": "Exact role+name: the only button named 'Search' (the 'Member Search' nav item is a link, and exact matching excludes it)."
+      },
+      "risk": "safe",
+      "wait_for": { "any_of": [ { "text": "Member Detail" } ] }
+    },
+    {
+      "step": 4,
+      "description": "Read the savings balance next to the 'Savings Balance:' label.",
+      "source": "agent",
+      "expect_page": { "text_visible": "Member Detail" },
+      "action": "extract",
+      "target": {
+        "strategies": [
+          { "by": "near_text", "anchor": "Savings Balance:", "relation": "right_of" },
+          { "by": "css", "value": "tr:has(> td:text-is('Savings Balance:')) > td:nth-child(2)" }
+        ],
+        "why": "The balance value differs per member, so it is found by its stable label. The amount also appears in the accounts table, so a plain text match would not be unique."
+      },
+      "save_as": "savings_balance",
+      "parse": "currency",
+      "risk": "safe"
+    }
+  ],
+
+  "success_check": {
+    "description": "We are on the member's detail page and the balance was read.",
+    "text_visible": "Member Detail",
+    "outputs_present": ["savings_balance"]
+  },
+
+  "error_handlers": [
+    { "id": "member_not_found", "description": "No member with that ID.", "scope": "any_step",
+      "when": { "text": "No member found." }, "type": "business_outcome", "result": "MEMBER_NOT_FOUND" },
+    { "id": "permission_denied", "description": "Restricted member.", "scope": "any_step",
+      "when": { "text": "You are not authorized to view this account." }, "type": "business_outcome", "result": "PERMISSION_DENIED" },
+    { "id": "account_already_exists", "description": "Duplicate account type.", "scope": "any_step",
+      "when": { "text": "This account already exists." }, "type": "business_outcome", "result": "ACCOUNT_ALREADY_EXISTS" },
+    { "id": "validation_error", "description": "A form value was rejected.", "scope": "any_step",
+      "when": { "text": "Please correct the following:" }, "type": "business_outcome", "result": "VALIDATION_ERROR" },
+    { "id": "notice_popup", "description": "Maintenance Notice dialog blocks the page.", "scope": "any_step",
+      "when": { "dialog": "Notice" }, "type": "recoverable",
+      "fix": { "action": "click", "target": { "strategies": [ { "by": "role", "role": "button", "name": "OK" } ], "why": "The dialog's only button." } },
+      "max_attempts": 3 },
+    { "id": "slow_page", "description": "The page is still loading.", "scope": "any_step",
+      "when": { "wait_timed_out": true }, "type": "recoverable", "fix": { "action": "wait", "seconds": 5 }, "max_attempts": 3 },
+    { "id": "session_expired", "description": "Signed out by the app.", "scope": "any_step",
+      "when": { "text": "Session expired" }, "type": "hard_failure", "then": "escalate" },
+    { "id": "server_error", "description": "The app crashed on this request.", "scope": "any_step",
+      "when": { "text": "Something went wrong." }, "type": "hard_failure", "then": "escalate" }
+  ],
+
+  "default_on_unknown": { "type": "hard_failure", "then": "escalate" }
+}
