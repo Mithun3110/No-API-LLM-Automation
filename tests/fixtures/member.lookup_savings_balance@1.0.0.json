@@ -87,7 +87,7 @@
       "target": {
         "strategies": [
           { "by": "near_text", "anchor": "Savings Balance:", "relation": "right_of" },
-          { "by": "css", "value": "tr:has(> td:text-is('Savings Balance:')) > td:nth-child(2)" }
+          { "by": "css", "value": "td:has-text('Savings Balance:') + td" }
         ],
         "why": "The balance value differs per member, so it is found by its stable label. The amount also appears in the accounts table, so a plain text match would not be unique."
       },

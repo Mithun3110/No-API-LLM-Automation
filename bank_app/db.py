@@ -7,13 +7,15 @@ delete bank.db to start fresh.
 """
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
 from werkzeug.security import generate_password_hash
 
 DATA_DIR = Path(__file__).parent / "data"
-DB_PATH = DATA_DIR / "bank.db"
+# BANK_DB_PATH lets tests run against a throwaway database instead of your bank.db.
+DB_PATH = Path(os.environ.get("BANK_DB_PATH") or DATA_DIR / "bank.db")
 SEED_PATH = DATA_DIR / "members.json"
 
 SCHEMA = """

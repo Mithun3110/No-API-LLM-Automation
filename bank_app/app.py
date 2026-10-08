@@ -24,7 +24,8 @@ import db
 
 APP_NAME = "CoreServ Teller"
 APP_VERSION = "4.2"
-PORT = 5050  # not 5000: macOS AirPlay Receiver uses 5000
+# Not 5000: macOS AirPlay Receiver uses it. BANK_PORT lets tests run a second copy.
+PORT = int(os.environ.get("BANK_PORT", "5050"))
 
 ACCOUNT_TYPES = ["Savings", "Checking", "Money Market", "Certificate of Deposit"]
 PHONE_PATTERN = re.compile(r"^\d{3}-\d{3}-\d{4}$")

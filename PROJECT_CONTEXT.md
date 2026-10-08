@@ -158,10 +158,11 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
 | Human steps in discovery | Recorded into the recipe as steps with `"source": "human"`; recipe saved with `needs_review: true` | Recipe stays complete and replayable |
 | Re-discovery of an existing recipe | Bump minor version, save as a new draft file `recipes/<recipe_id>@<version>.json`, keep the old file | Old version stays active until the new one is approved |
 | Masking format | Member IDs `***45` (last 2 digits); balances, names, phones, addresses, passwords fully `***` | Regulated data; last digits help debugging |
-| LLM provider | Anthropic by default; provider-agnostic client, switchable to OpenAI via `.env` | Real key arrives before step 13 |
+| LLM provider | Anthropic by default; provider-agnostic client, switchable to OpenAI via `.env`. The user has a Groq key in `.env` (Groq is OpenAI-compatible); confirm provider wiring in step 6 | Real key available from step 6 |
 | Git | Commit after each step once the user has tested and confirmed; the user pushes | Clear history, user stays in control |
 | Tests | pytest, focused on recipe schema, error classification, safety, replay against the fake bank | Tested where it counts |
 | Flask port | 5050 (not 5000) | macOS AirPlay Receiver uses port 5000 |
+| Test isolation | Tests start their own bank on port 5051 with a throwaway DB (`BANK_PORT`, `BANK_DB_PATH` env overrides) | Tests never touch the user's bank or data; always start from seed |
 
 ---
 
@@ -251,6 +252,11 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
     - The only module that imports Playwright.
     - Functions: open, goto, accessibility snapshot, find element by strategies, click, type, select, read text, screenshot, start and stop trace, current URL.
     - This is the surface seam. A desktop version would implement the same functions with a desktop accessibility API.
+    - Returns its own types (`Element`, `FindResult`, `BrowserError`), never Playwright objects or exceptions, so callers do not depend on Playwright.
+    - `find` tries strategies in order; a strategy counts only if it matches exactly one VISIBLE element. `FindResult` records every attempt (e.g. `role=button "Search": 1 match`) and whether a backup was used (drift).
+    - `compact_snapshot` strips the repeated names of layout containers (nested tables repeat all inner text at every level), about 40% smaller, so the LLM sees each text once.
+    - Short action timeout (5s) so a click blocked by a popup fails fast with "blocked by <overlay>" for the replay engine to classify.
+    - Manual check: `python -m src.browser.demo [member_id]` (bank must be running).
 
 11. Logging and evidence (`src/logs/`)
     - Each run gets a folder: `runs/<run_id>/` with `log.jsonl`, `result.json`, screenshots, traces, and intervention requests.
