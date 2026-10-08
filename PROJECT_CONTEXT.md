@@ -196,7 +196,20 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
    - Targets are referenced by role and name as seen in the accessibility tree.
    - Stops on: `done` (goal met), 20 steps, timeout, or stuck.
    - Stuck means: the same action failed twice, the page did not change after an action, the LLM called `ask_human`, or the step limit was reached. Stuck leads to human takeover.
-   - Mock LLM: plays back scripted decisions from `config/mock_scripts/<name>.json`, so discovery runs without a key.
+   - Mock LLM: plays back scripted decisions from `config/mock_scripts/<name>.json`, so discovery runs without a key. A script is chosen when the goal contains its `goal_keywords` and matches its `goal_pattern`; named groups (e.g. `member_id`) fill `{{placeholders}}` in the scripted calls.
+   - Built in step 6 (`src/agent/`):
+     - Provider: Groq by default (`LLM_PROVIDER=groq`), through the `openai` SDK with Groq's base URL (Groq is OpenAI-compatible). Model `openai/gpt-oss-120b` (chosen after testing tool calls; `qwen/qwen3.8-27b` also works). `LLM_MODEL` in `.env` overrides. Anthropic and OpenAI clients exist behind the same interface but are untested.
+     - Each turn is a fresh, self-contained prompt (system + one user message: goal, task, last 12 actions with results, current path, compact tree capped at `max_tree_chars`), not a growing chat. Bounded tokens, and no provider-specific tool-result formats.
+     - `tool_choice` is required; only the first tool call is used, so the model can never batch actions.
+     - Tool names: `define_task`, `navigate(path)`, `click(role, name)`, `type_text(name, text)`, `select_option(name, option)`, `extract(label, output, parse)`, `wait(seconds)`, `done(success, summary)`, `ask_human(reason)`. Arguments are validated with Pydantic; invalid calls become feedback in the next prompt, not crashes.
+     - `extract` reads the value next to a label (near_text), because the value itself changes per member.
+     - `define_task` inputs must appear verbatim in the goal (no invented values). `sensitive` defaults to true (models often omit it). Sensitive inputs and extracted outputs are registered with the masker.
+     - `done(success=false)` means the goal is not achievable (e.g. "No member found"): run ends FAILED, no recipe.
+     - Stuck rules as implemented: the same action (tool + args) failed twice; a CLICK left the page unchanged (url + tree fingerprint; navigate to the current page is not counted); `ask_human`; step limit; timeout (`discovery_timeout_s`, 300). Blocked, not-found, invalid and failed actions are fed back to the LLM and count toward "failed twice".
+     - Groq validates tool arguments against the schema server-side and returns 400 on a mismatch; that error is retried like a transient one.
+     - Non-success runs save a screenshot and keep the trace. `result.json` is written for every discovery run.
+     - Try it before the CLI exists: `python -m src.agent "<goal>" [--mock] [--slow]`.
+     - Observed with the real model: it dismisses the Notice popup by clicking OK. The RECORDER (step 7) must leave such steps out of the recipe, because the recipe's recoverable error handler covers the popup.
 
 5. Recorder (`src/recorder/`)
    - Runs only after a successful discovery run.
@@ -501,8 +514,9 @@ Step limit 20, wait timeout 10 seconds, recoverable retries 3, recovery max acti
 
 ### D6. Environment (`.env`, never committed; `.env.example` committed)
 ```
-LLM_PROVIDER=anthropic
+LLM_PROVIDER=groq            # groq | anthropic | openai
 LLM_API_KEY=your_key_here
+# LLM_MODEL=                 # optional override of config/settings.json llm_models
 BANK_USERNAME=demo
 BANK_PASSWORD=demo123
 ```
@@ -515,7 +529,7 @@ BANK_PASSWORD=demo123
 3. Checked for every action, every time, in every mode. Recipes are not trusted just because they were safe when saved.
 4. Reading and navigating are free. Clicks that change data need human approval after the form is filled in.
 5. Masking in all logs. Recipes store placeholders, never real values. Credentials only in `.env`.
-6. Known limits (for REPORT): screenshots may contain private data (kept local, fake data); the risky button list must be maintained; text-based error detection depends on known messages.
+6. Known limits (for REPORT): screenshots may contain private data (kept local, fake data); the risky button list must be maintained; text-based error detection depends on known messages. Also: during discovery the page tree (with fake member data) is sent to the LLM provider; in production use a provider with zero data retention or a self-hosted model. Replay sends nothing to any LLM.
 
 ---
 

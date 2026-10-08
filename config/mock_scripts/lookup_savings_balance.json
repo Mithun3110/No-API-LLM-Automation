@@ -1,0 +1,67 @@
+{
+  "description": "Scripted discovery of the savings balance lookup, as a real model would do it.",
+  "goal_keywords": [
+    "savings balance"
+  ],
+  "goal_pattern": "member (?P<member_id>\\d{5})",
+  "calls": [
+    {
+      "tool": "define_task",
+      "args": {
+        "recipe_id": "member.lookup_savings_balance",
+        "name": "Look up member savings balance",
+        "description": "Search for a member by 5-digit ID and read their current savings balance.",
+        "inputs": [
+          {
+            "name": "member_id",
+            "description": "The member's 5-digit member ID.",
+            "type": "string",
+            "value": "{{member_id}}",
+            "pattern": "^\\d{5}$",
+            "sensitive": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "savings_balance",
+            "description": "Current savings balance in USD.",
+            "type": "currency",
+            "sensitive": true
+          }
+        ]
+      }
+    },
+    {
+      "tool": "type_text",
+      "args": {
+        "name": "Member ID",
+        "text": "{{member_id}}",
+        "reason": "Enter the member ID to search for."
+      }
+    },
+    {
+      "tool": "click",
+      "args": {
+        "role": "button",
+        "name": "Search",
+        "reason": "Run the search to open the member."
+      }
+    },
+    {
+      "tool": "extract",
+      "args": {
+        "label": "Savings Balance:",
+        "output": "savings_balance",
+        "parse": "currency",
+        "reason": "Read the savings balance shown on the member detail page."
+      }
+    },
+    {
+      "tool": "done",
+      "args": {
+        "success": true,
+        "summary": "Read the savings balance."
+      }
+    }
+  ]
+}

@@ -126,6 +126,11 @@ class Browser:
             lines.append(line)
         return "\n".join(lines)
 
+    def heading(self) -> str:
+        """The page's main heading (first visible h1/h2), e.g. "Member Detail". Empty if none."""
+        h = self.page.locator("h1, h2").filter(visible=True)
+        return h.first.inner_text().strip() if h.count() else ""
+
     def visible_text(self, max_chars: int = 2000) -> str:
         """The page's visible text, whitespace collapsed. Used for approval summaries."""
         text = " ".join(self.page.locator("body").inner_text().split())

@@ -1,8 +1,17 @@
 {
   "bank_base_url": "http://localhost:5050",
+  "entry_path": "/search",
   "step_limit": 20,
+  "discovery_timeout_s": 300,
   "wait_timeout_s": 10,
   "recoverable_retries": 3,
   "recovery_max_actions": 3,
-  "headless": false
+  "headless": false,
+  "llm_models": {
+    "groq": "openai/gpt-oss-120b",
+    "anthropic": "claude-sonnet-5-5",
+    "openai": "gpt-4.1"
+  },
+  "llm_temperature": 0,
+  "max_tree_chars": 15000
 }

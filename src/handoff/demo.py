@@ -6,6 +6,7 @@ Everything is logged, masked, to runs/<run_id>/log.jsonl.
 
 delay_ms (default 800) slows every browser action so you can watch; 0 = full speed.
 Runs on its own: it announces each part, pauses briefly, then carries on.
+At the end the browser stays open until you press Enter.
 """
 
 import sys
@@ -46,7 +47,9 @@ def main() -> None:
         s.perform(Action("click", (RoleStrategy(by="role", role="button", name="Confirm"),), reason="confirm"))
 
         print(f"\n  Still on the review page: nothing was opened. Log: {s.logger.folder.log_path}")
-        announce(s, "Done. Closing the browser in 5 seconds.", seconds=5)
+        print("\n>>> Done.")
+        if sys.stdin.isatty():  # do not hang when run from a script
+            input("    Browser left open so you can look around. Press Enter to close it...")
 
 
 if __name__ == "__main__":
