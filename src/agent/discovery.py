@@ -160,6 +160,8 @@ class Discovery:
                          heading_after=browser.heading(), locators=locators, in_dialog=in_dialog,
                          value=action.value if action.value is not None else action.url)
 
+        if outcome.ok and not outcome.settled:
+            step.message = "the next page is still loading"  # the model sees this and can wait
         if outcome.status == "rejected":
             self._add(step)
             return self._finish("rejected", detail=outcome.message)

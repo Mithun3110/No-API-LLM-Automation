@@ -16,7 +16,7 @@ from urllib.parse import urljoin, urlsplit
 
 from dotenv import load_dotenv
 
-from src.browser import Browser, BrowserError
+from src.browser import Browser, BrowserError, ElementBlocked
 from src.logs import RunFolder, RunLogger
 from src.logs.run_folder import DEFAULT_RUNS_DIR
 from src.models import ControlState, Policy
@@ -49,6 +49,7 @@ class Session:
         self.approver = approver
         self._control = ControlState.AUTOMATION
         self.keep_trace = False  # set True to keep the trace even when the run did not raise
+        self.approvals: list[str] = []  # every approval decision this run, masked, for the result
 
     # ------------------------------------------------------------ control
     @property
@@ -75,13 +76,13 @@ class Session:
             found = self.browser.find(list(action.strategies))
             if not found.found:
                 return self._log(action, ActionOutcome("not_found", "no strategy matched exactly one element",
-                                                       attempts=found.attempts))
+                                                       attempts=found.attempts, performed=False))
 
         decision = self.guard.check(self._proposed(action))
         if decision.verdict == "block":
-            outcome = ActionOutcome("blocked", decision.reason)
+            outcome = ActionOutcome("blocked", decision.reason, performed=False)
         elif decision.verdict == "needs_approval" and not self._ask_approval(action, decision.reason):
-            outcome = ActionOutcome("rejected", "operator rejected: " + decision.reason)
+            outcome = ActionOutcome("rejected", "operator rejected: " + decision.reason, performed=False)
         else:
             outcome = self._execute(action, found.element if found else None)
         outcome.rule = decision.rule
@@ -108,17 +109,24 @@ class Session:
                     b.goto(self.absolute(action.url))
                 case "click":
                     b.click(element)
+                    # Clicks return before the next page arrives. Settle so callers never act on
+                    # (or read) the old page. A slow page is reported, not retried.
+                    if not b.settle(self.settings.wait_timeout_s):
+                        return ActionOutcome("done", "the next page is still loading", performed=True,
+                                             settled=False)
                 case "type":
                     b.type(element, action.value or "")
                 case "select":
                     b.select(element, action.value or "")
                 case "extract":
-                    return ActionOutcome("done", text=b.read_text(element))
+                    return ActionOutcome("done", text=b.read_text(element), performed=True)
                 case "wait":
                     b.wait(action.seconds or 1)
+        except ElementBlocked as e:
+            return ActionOutcome("failed", str(e), performed=False)
         except BrowserError as e:
-            return ActionOutcome("failed", str(e))
-        return ActionOutcome("done")
+            return ActionOutcome("failed", str(e), performed=None)  # may or may not have happened
+        return ActionOutcome("done", performed=True)
 
     def _ask_approval(self, action: Action, reason: str) -> bool:
         m = self.logger.masker
@@ -138,6 +146,7 @@ class Session:
             self.set_control(previous, "approval answered", action.mode)
         self.logger.log(action.mode, "approved" if approved else "rejected", self._control, step=action.step,
                         action="approval", target=request.action_description, reason=reason)
+        self.approvals.append(f"{'approved' if approved else 'rejected'}: {request.action_description}")
         return approved
 
     def _log(self, action: Action, outcome: ActionOutcome) -> ActionOutcome:

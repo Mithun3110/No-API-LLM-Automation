@@ -17,6 +17,7 @@ def open_member(b, bank_url, member_id="12345"):
     b.goto(bank_url + "/search")
     b.type(b.find(SEARCH_BOX).element, member_id)
     b.click(b.find(SEARCH_BUTTON).element)
+    b.settle(10)  # click returns before the next page arrives
 
 
 def test_find_by_role_and_name_uses_first_strategy(logged_in):

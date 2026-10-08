@@ -8,6 +8,8 @@ How you work:
 - Identify elements by role and name EXACTLY as they appear in the tree. Never invent elements.
 - Read values with `extract`, using the label shown next to the value (e.g. "Savings Balance:").
 - If a dialog is open (e.g. "Notice"), deal with it first, usually by clicking its OK button.
+- If your last action says the next page is still loading, use `wait`. Never repeat a click
+  just because the page has not changed yet: it may submit twice.
 - Only do what the goal needs. Do not change data unless the goal asks for it.
 - When every declared output has been extracted, call `done` with success=true.
 - If the goal cannot be achieved (e.g. "No member found"), call `done` with success=false and say why.

@@ -33,6 +33,10 @@ class BrowserError(Exception):
     """Any failure from the browser: element not actionable, navigation failed, etc."""
 
 
+class ElementBlocked(BrowserError):
+    """Another element (e.g. a modal overlay) covers the target. The action did NOT happen."""
+
+
 @dataclass
 class Element:
     """An element found by a strategy. Opaque to callers: pass it back to click/type/read."""
@@ -82,6 +86,19 @@ class Browser:
         self._context.set_default_timeout(ACTION_TIMEOUT_MS)
         self.page: Page = self._context.new_page()
         self._tracing = False
+        # Page loads in flight. A click returns before the next page arrives, and the old page
+        # stays visible meanwhile, so "what is on screen" alone cannot tell us we are done.
+        self._pending_navigations: set = set()
+        self.page.on("request", self._on_request)
+        self.page.on("requestfinished", self._on_request_done)
+        self.page.on("requestfailed", self._on_request_done)
+
+    def _on_request(self, request) -> None:
+        if request.is_navigation_request() and request.frame == self.page.main_frame:
+            self._pending_navigations.add(request)
+
+    def _on_request_done(self, request) -> None:
+        self._pending_navigations.discard(request)
 
     # ------------------------------------------------------------ lifecycle
     def close(self) -> None:
@@ -159,6 +176,25 @@ class Browser:
             if time.monotonic() >= deadline:
                 return None
             self.page.wait_for_timeout(POLL_INTERVAL_MS)
+
+    def settle(self, timeout_s: float) -> bool:
+        """Wait until no page load is in flight and the current page has loaded.
+
+        Returns False if a load is still in flight after timeout_s (e.g. a slow page). The
+        caller decides what that means; nothing is retried here.
+        """
+        self.page.wait_for_timeout(100)  # give a just-dispatched click time to start its request
+        deadline = time.monotonic() + timeout_s
+        while self._pending_navigations:
+            if time.monotonic() >= deadline:
+                return False
+            self.page.wait_for_timeout(POLL_INTERVAL_MS)
+        try:
+            remaining = max(deadline - time.monotonic(), 0.1)
+            self.page.wait_for_load_state("load", timeout=remaining * 1000)
+        except PlaywrightError:
+            return False
+        return True
 
     def wait(self, seconds: float) -> None:
         """Pause without blocking Playwright's event processing (unlike time.sleep)."""
@@ -274,7 +310,10 @@ class Browser:
 
     # ------------------------------------------------------------ actions
     def click(self, element: Element) -> None:
-        self._act(element, "click", lambda loc: loc.click())
+        # no_wait_after: return as soon as the click is dispatched. Waiting for the next page
+        # is the caller's job (wait_for). Without it, a slow page makes click() time out even
+        # though the click HAPPENED, and a retry would submit twice.
+        self._act(element, "click", lambda loc: loc.click(no_wait_after=True))
 
     def type(self, element: Element, value: str) -> None:
         # fill() replaces existing text; typing on top of a pre-filled field would append.
@@ -294,7 +333,10 @@ class Browser:
         try:
             action(element._locator)
         except PlaywrightError as e:
-            raise BrowserError(f"could not {verb} {element.description}: {blocked_reason(e)}") from e
+            message = f"could not {verb} {element.description}: {blocked_reason(e)}"
+            if "intercepts pointer events" in str(e):
+                raise ElementBlocked(message) from e  # certain: the action never reached the element
+            raise BrowserError(message) from e
 
     # ------------------------------------------------------------ evidence
     def screenshot(self, path: Path) -> Path:

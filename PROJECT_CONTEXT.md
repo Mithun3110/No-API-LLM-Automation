@@ -249,6 +249,18 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
      - Hard failure or anything unknown: stop, save a screenshot, accessibility snapshot, and trace; return a failure with step, expected, and observed.
    - At the end, verify the success check and return the outputs.
    - What happens after a hard failure depends on the caller: `ask` tries bounded LLM recovery; `replay` goes straight to human takeover.
+   - Built in step 8 (`src/replay/engine.py`, `src/replay/inputs.py`):
+     - `replay(recipe, inputs, session, start_at=1) -> ReplayResult(run_result, failed_step, outputs)`. Inputs are validated first (unknown names, required, pattern, number/currency); INVALID_INPUT never touches the page, and sensitive values are never echoed in the error. `start_at` is for resuming after a takeover (step 9).
+     - Per step: only_if -> error handlers ("before") -> expect_page (2 s grace) -> act via `Session.perform` -> extract/parse -> wait_for while watching handlers ("after").
+     - Handler check order: business outcomes first (they are the answer), then hard failures, then recoverable. `after_step:N` is active while finishing step N and before step N+1.
+     - The wait budget (10 s) counts from the start of the action. On timeout, a `wait_timed_out` recoverable handler (slow page) adds its wait, up to `max_attempts`; then hard failure `wait_timeout`.
+     - Recoverable attempts are counted per (step, handler); exceeding `max_attempts` is a hard failure.
+     - Retry rule, as implemented: an action is redone only if `ActionOutcome.performed is False` (certainly did not happen: not found, blocked by policy or by an overlay) or the step is repeatable (navigate, type, extract). A popup after an action is dismissed and waiting continues.
+     - Found by testing: with a slow next page, Playwright's `click()` timed out after 5 s although the click HAD happened. Fix in the browser layer: clicks use `no_wait_after=True` (return once dispatched) and an overlay-blocked click raises `ElementBlocked` (certainly not performed). `Browser.settle()` tracks in-flight main-frame page loads (request events), and `perform()` settles after every click, reporting `settled=False` for a slow page instead of retrying. Discovery tells the model "the next page is still loading" and the prompt forbids repeating a click.
+     - Hard failure evidence: screenshot, masked accessibility snapshot (`step<N>_failure_accessibility.yaml`), and the trace (kept on session close). FailureInfo has step, expected, observed, error_type (handler id, or wrong_page, element_not_found, action_failed, policy_blocked, wait_timeout, parse_error, success_check).
+     - Approvals made during the run are listed in the result (`Session.approvals`).
+     - A test checks (AST + a fresh interpreter) that `src/replay` never imports `src.agent`, `openai` or `anthropic`.
+     - Try it before the CLI exists: `python -m src.replay recipes/<file>.json member_id=12345 [--slow] [--auto-close]`.
 
 7. Bounded LLM recovery (`src/recovery/`), used only by `ask`
    - Triggered only by a hard failure, never by a business outcome.

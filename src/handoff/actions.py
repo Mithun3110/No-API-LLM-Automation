@@ -47,6 +47,10 @@ class ActionOutcome:
     drifted: bool = False                      # a backup strategy was needed
     attempts: list[str] = field(default_factory=list)
     rule: str | None = None                    # safety rule that decided, if any
+    # Did the action reach the page? True: yes. False: certainly not (not found, blocked by
+    # policy or an overlay, rejected), so retrying is safe. None: unknown, never retry.
+    performed: bool | None = None
+    settled: bool = True                       # False: a page load was still in flight afterwards
 
     @property
     def ok(self) -> bool:

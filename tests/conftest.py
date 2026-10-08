@@ -19,7 +19,8 @@ def bank_url(tmp_path_factory) -> str:
     """Start the bank on a throwaway database, so every test session starts from the seed data.
 
     One bank serves the whole test session. Tests that CHANGE data (an approved Confirm) must
-    use a member no other test relies on: 12348 (session), 23457 and 45679 (recorder).
+    use a member no other test relies on: 12348 (session), 23457 and 45679 (recorder),
+    23499 and 45678 (replay).
     """
     db_path = tmp_path_factory.mktemp("bank") / "bank.db"
     env = {**os.environ, "BANK_DB_PATH": str(db_path), "BANK_PORT": str(TEST_PORT)}
