@@ -240,11 +240,15 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
    - Masking: one function used by all logging, masking sensitive inputs, outputs, and known patterns. Three layers (`src/safety/masking.py`): (1) field names matching `mask_fields` (`member_id`, `savings_balance`, `new_phone`, ...); (2) known values of this run (password, inputs, outputs) wherever they appear in free text; (3) patterns: 8+ digit numbers (accounts), phones, money, 5-digit numbers (member IDs as `***45`; zip codes are masked too).
    - `mask_fields` also includes `amount` and `deposit` (money typed into forms).
    - The guard (`src/safety/guard.py`) is a pure function: `check(ProposedAction) -> Decision(allow | needs_approval | block, rule, reason)`. It checks the action type, the current page URL AND the navigate destination (normalised, so `/member/../_admin` cannot slip through), and flags clicks on buttons whose name contains a risky word (whole word, case-insensitive), or any `irreversible` step. Links are never risky (they only open pages); an unknown role is treated like a button. `allow_risky=False` turns approval into a block for bounded recovery.
-   - Where it is enforced: the session layer (step 5) owns the only path to the browser for actions and calls the guard before every action.
+   - Where it is enforced: `Session.perform(Action)` in `src/handoff/session.py` is the only path to the browser for actions. Order: (1) refuse unless control is AUTOMATION (raises ControlError, a programming error, never a page state); (2) find the element; (3) guard check; (4) approval if needed (control goes PAUSED while waiting, then back); (5) execute; (6) log, masked.
+   - The risk check uses the element's DECLARED identity (the step's first role strategy), not whichever backup matched, so a CSS fallback can never hide that a button is "Confirm".
+   - A fresh browser starts on `about:blank`; from there the only allowed action is navigating to an allowlisted URL.
+   - Approval is a pluggable `Approver` callback. Default `reject_all` (no human to ask means no). The terminal yes/no approver arrives in step 9.
 
 9. Session and control (`src/handoff/`)
    - One browser session per run, shared by the automation and the human.
-   - Logs in automatically at the start using `BANK_USERNAME` and `BANK_PASSWORD` from `.env`. Never logged or saved.
+   - Logs in automatically at the start using `BANK_USERNAME` and `BANK_PASSWORD` from `.env`. Never logged or saved. Login goes through the same `perform()` gate; the password is registered with the masker first. A rejected login raises SessionError.
+   - `open_session(mode, ...)` context manager: opens the browser, starts a trace, signs in, yields the Session, and on exit keeps the trace only if the run failed (or `session.keep_trace` is set).
    - Control state: `AUTOMATION`, `HUMAN`, or `PAUSED`. Only one can act. Every change is logged.
    - Intervention request: printed in the terminal and saved as JSON in the run folder, with goal or recipe, current step, reason, screenshot path, and current URL.
    - While the human is in control, a small script injected into the page records their clicks and typing (masked) and sends them back to Python through Playwright's `expose_binding`.
@@ -493,7 +497,7 @@ The paths above are examples; match them to the real bank app routes.
 Error rules for the bank app that the recorder adds to every recipe: member not found (business outcome), permission denied (business outcome), account already exists (business outcome), validation error (business outcome `VALIDATION_ERROR`), Notice popup (recoverable), slow page (recoverable), session expired (hard failure), server error (hard failure).
 
 ### D5. Settings (`config/settings.json`)
-Step limit 20, wait timeout 10 seconds, recoverable retries 3, recovery max actions 3, LLM provider, model name, mock mode default, bank base URL `http://localhost:5050`.
+Step limit 20, wait timeout 10 seconds, recoverable retries 3, recovery max actions 3, LLM provider, model name, mock mode default, bank base URL `http://localhost:5050`. Typed by `src/models/settings.py`. Created in step 5 without the LLM fields; those are added in step 6 once the provider (Groq) wiring is confirmed.
 
 ### D6. Environment (`.env`, never committed; `.env.example` committed)
 ```

@@ -58,7 +58,10 @@ class SafetyGuard:
             return Decision("block", "action_not_allowed", f"action '{proposed.action}' is not in the allowlist")
 
         # Acting on a page outside the allowlist is blocked, not only navigating to one.
-        problem = self.url_problem(proposed.page_url)
+        # One exception: a fresh browser starts on about:blank, and the only thing allowed
+        # from there is navigating to an allowed page (checked just below).
+        starting = proposed.page_url == "about:blank" and proposed.action == "navigate"
+        problem = None if starting else self.url_problem(proposed.page_url)
         if problem:
             return Decision("block", "page_not_allowed", f"current page is outside the allowlist: {problem}")
 

@@ -126,6 +126,11 @@ class Browser:
             lines.append(line)
         return "\n".join(lines)
 
+    def visible_text(self, max_chars: int = 2000) -> str:
+        """The page's visible text, whitespace collapsed. Used for approval summaries."""
+        text = " ".join(self.page.locator("body").inner_text().split())
+        return text[:max_chars] + ("..." if len(text) > max_chars else "")
+
     def text_visible(self, text: str) -> bool:
         """True if this text is visible anywhere on the page (substring match)."""
         return self.page.get_by_text(text).filter(visible=True).count() > 0
@@ -149,6 +154,10 @@ class Browser:
             if time.monotonic() >= deadline:
                 return None
             self.page.wait_for_timeout(POLL_INTERVAL_MS)
+
+    def wait(self, seconds: float) -> None:
+        """Pause without blocking Playwright's event processing (unlike time.sleep)."""
+        self.page.wait_for_timeout(seconds * 1000)
 
     # ------------------------------------------------------------ finding elements
     def find(self, strategies: list[Strategy]) -> FindResult:

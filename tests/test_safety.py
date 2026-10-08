@@ -116,3 +116,9 @@ def test_mask_nested_data(masker):
 
 def test_masking_leaves_structure_alone(masker):
     assert masker.mask_text('step 3: click role=button "Search"') == 'step 3: click role=button "Search"'
+
+
+def test_blank_start_page_only_allows_navigating_into_the_allowlist(guard):
+    assert guard.check(act("navigate", page="about:blank", target_url=BANK + "/login")).allowed
+    assert guard.check(act("navigate", page="about:blank", target_url="https://evil.example.com/")).verdict == "block"
+    assert guard.check(act("click", page="about:blank", target_role="button", target_name="OK")).rule == "page_not_allowed"
