@@ -1,0 +1,8 @@
+{
+  "allowed_domains": ["localhost:5050", "127.0.0.1:5050"],
+  "allowed_paths": ["/", "/login", "/search", "/members", "/member/*"],
+  "allowed_actions": ["navigate", "click", "type", "select", "extract", "wait"],
+  "risky_button_names": ["Confirm", "Submit", "Create", "Update", "Save", "Transfer", "Close Account", "Delete"],
+  "risky_requires": "human_approval",
+  "mask_fields": ["member_id", "phone", "name", "balance", "password", "account_number", "address", "amount", "deposit"]
+}

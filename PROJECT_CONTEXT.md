@@ -237,7 +237,10 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
    - Every action from discovery, replay, recovery, and the catalog passes through it before the browser runs it. Enforced in code, never only in a prompt.
    - Allowlist check: domain, path, and action type from `config/policy.json`.
    - Risk check: clicks on buttons that change data (from the risky list in the policy, plus any step marked `irreversible`) pause for human approval.
-   - Masking: one function used by all logging, masking sensitive inputs, outputs, and known patterns.
+   - Masking: one function used by all logging, masking sensitive inputs, outputs, and known patterns. Three layers (`src/safety/masking.py`): (1) field names matching `mask_fields` (`member_id`, `savings_balance`, `new_phone`, ...); (2) known values of this run (password, inputs, outputs) wherever they appear in free text; (3) patterns: 8+ digit numbers (accounts), phones, money, 5-digit numbers (member IDs as `***45`; zip codes are masked too).
+   - `mask_fields` also includes `amount` and `deposit` (money typed into forms).
+   - The guard (`src/safety/guard.py`) is a pure function: `check(ProposedAction) -> Decision(allow | needs_approval | block, rule, reason)`. It checks the action type, the current page URL AND the navigate destination (normalised, so `/member/../_admin` cannot slip through), and flags clicks on buttons whose name contains a risky word (whole word, case-insensitive), or any `irreversible` step. Links are never risky (they only open pages); an unknown role is treated like a button. `allow_risky=False` turns approval into a block for bounded recovery.
+   - Where it is enforced: the session layer (step 5) owns the only path to the browser for actions and calls the guard before every action.
 
 9. Session and control (`src/handoff/`)
    - One browser session per run, shared by the automation and the human.
@@ -262,6 +265,7 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
     - Each run gets a folder: `runs/<run_id>/` with `log.jsonl`, `result.json`, screenshots, traces, and intervention requests.
     - Log entry fields: timestamp, run_id, mode (discover, replay, recovery, human), step, action, target, reason, outcome, controller, warnings.
     - All values pass through the masking function before writing.
+    - Run ids look like `20261008T203012Z-a3f9` (UTC, matching log timestamps). `result.json` is masked like the log, except structural fields (ids, status, evidence paths); the caller still receives real output values.
     - Selected runs are copied into `evidence/` for submission.
 
 12. Models (`src/models/`)
