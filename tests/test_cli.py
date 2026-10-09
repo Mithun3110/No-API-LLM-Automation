@@ -223,3 +223,11 @@ def test_result_says_whether_a_recipe_or_the_llm_answered(ctx):
     cli(ctx, "replay", "--recipe", RECIPE_ID, "--input", "member_id=12346")
     pure = last_result(ctx)
     assert pure["answered_by"] == "recipe" and pure["llm_used_for"] == []
+
+
+def test_only_ask_gets_llm_recovery(ctx):
+    from types import SimpleNamespace
+    from src.recovery import GiveUpRecoverer
+    args = SimpleNamespace(mock=True)
+    assert run.make_recoverer(args, ctx, None, "replay") is None          # strict: straight to a human
+    assert isinstance(run.make_recoverer(args, ctx, None, "ask"), GiveUpRecoverer)

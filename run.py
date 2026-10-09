@@ -233,10 +233,21 @@ def run_replay(args, ctx: Context, stored: StoredRecipe, inputs: dict, how: str,
                            "inputs": inputs})
         if getattr(args, "inject", None):
             inject_before_step(s, args.inject, args.at_step)
-        result = replay(recipe, inputs, s, operator, llm_used_for).run_result
+        result = replay(recipe, inputs, s, operator, llm_used_for, make_recoverer(args, ctx, s, mode)).run_result
         print_result(result, s.logger.folder.path)
         wait_before_closing(args, ctx)
     return result
+
+
+def make_recoverer(args, ctx: Context, s, mode: str):
+    """Bounded LLM recovery is for `ask` only; strict `replay` goes straight to a human."""
+    if mode != "ask":
+        return None
+    from src.recovery import GiveUpRecoverer, LLMRecoverer  # LLM code: only on this path
+    if args.mock:
+        return GiveUpRecoverer()
+    from src.agent.llm import make_llm
+    return LLMRecoverer(s, make_llm(ctx.settings))
 
 
 def session(args, ctx: Context, mode: str, operator):

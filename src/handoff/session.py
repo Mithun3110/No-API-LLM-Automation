@@ -85,7 +85,8 @@ class Session:
                 return self._log(action, ActionOutcome("not_found", "no strategy matched exactly one element",
                                                        attempts=found.attempts, performed=False))
 
-        decision = self.guard.check(self._proposed(action))
+        # Bounded LLM recovery may never do a risky step: the guard blocks instead of asking.
+        decision = self.guard.check(self._proposed(action), allow_risky=action.mode != "recovery")
         if decision.verdict == "block":
             outcome = ActionOutcome("blocked", decision.reason, performed=False)
         elif decision.verdict == "needs_approval" and not self._ask_approval(action, decision.reason):

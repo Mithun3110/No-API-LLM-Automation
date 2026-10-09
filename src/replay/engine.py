@@ -9,8 +9,10 @@ For each step:
   6. extract    - parse and keep declared outputs
 Then the success check.
 
-On a hard failure, if an operator is available, a human takes over the same live session.
-On resume, replay continues from the step that matches the page the human left it on.
+On a hard failure: first, if a recoverer was given (only `ask` does), ONE bounded LLM attempt
+to complete just that step, then re-check the step's own success criteria. If that is not
+possible or fails, and an operator is available, a human takes over the same live session;
+on resume, replay continues from the step that matches the page the human left it on.
 
 Three kinds of result, kept apart on purpose:
 - business outcome: a valid answer (e.g. MEMBER_NOT_FOUND). Stop and return the code.
@@ -37,6 +39,7 @@ from src.models.recipe import (
 from src.models.values import ParseError, parse_value
 
 from .inputs import fill, validate_inputs
+from .recovery_api import RECOVERABLE_BY_LLM, RecoveryRequest, Recoverer
 
 EXPECT_PAGE_GRACE_S = 2  # short tolerance for a page that is just finishing rendering
 POLL_S = 0.5             # how often errors and popups are checked while waiting
@@ -72,8 +75,12 @@ class ReplayResult:
 
 
 class Replayer:
-    def __init__(self, recipe: Recipe, session: Session, inputs: dict[str, str], llm_used_for: list[str] | None = None):
+    def __init__(self, recipe: Recipe, session: Session, inputs: dict[str, str], llm_used_for: list[str] | None = None,
+                 recoverer: Recoverer | None = None):
         self.recipe = recipe
+        self.recoverer = recoverer
+        self._recovery_tried: set[int] = set()  # once per step: a second attempt is a human's job
+        self.llm_recovery_used = False
         self.llm_used_for = list(llm_used_for or [])  # decided by the caller (e.g. matching); replay adds none
         self.session = session
         self.browser = session.browser
@@ -89,9 +96,14 @@ class Replayer:
     # ------------------------------------------------------------ run
     def run(self, operator: Operator | None = None, start_at: int = 1) -> ReplayResult:
         stop = self._execute(start_at)
-        # Hard failure: hand the same live session to a human, then resume where the page is.
-        while stop.status == RunStatus.FAILED and operator is not None \
-                and self.session.takeovers < self.session.settings.max_takeovers:
+        while stop.status == RunStatus.FAILED:
+            # 1. One bounded LLM attempt at the failed step (ask only), then carry on deterministically.
+            if self._try_recovery(stop):
+                stop = self._execute(stop.step + 1) if stop.step < len(self.recipe.steps) else self._finish_steps()
+                continue
+            # 2. Otherwise hand the same live session to a human, then resume where the page is.
+            if operator is None or self.session.takeovers >= self.session.settings.max_takeovers:
+                break
             step = self.recipe.steps[stop.step - 1] if stop.step else None
             takeover = take_over(self.session, operator, "replay", "hard_failure",
                                  f"{stop.error_type}: expected {stop.expected}; observed {stop.observed}",
@@ -111,6 +123,56 @@ class Replayer:
         if stop.status == RunStatus.FAILED and self.session.takeovers:
             stop.status = RunStatus.ESCALATED  # a human had it and it still did not finish
         return self._finish(stop)
+
+    def _finish_steps(self) -> StepStop:
+        """After recovering the LAST step: only the success check is left."""
+        try:
+            self._success_check()
+        except StopReplay as stop:
+            if stop.result.status == RunStatus.FAILED:
+                self._capture_evidence(stop.result)
+            return stop.result
+        return StepStop(RunStatus.SUCCESS, None)
+
+    # ------------------------------------------------------------ bounded LLM recovery
+    def _try_recovery(self, stop: StepStop) -> bool:
+        if self.recoverer is None or stop.step is None or stop.step in self._recovery_tried:
+            return False
+        step = self.recipe.steps[stop.step - 1]
+        if stop.error_type not in RECOVERABLE_BY_LLM or step.risk == "irreversible":
+            # Known bad states need a human; a risky step is never handed to an LLM.
+            return False
+        self._recovery_tried.add(step.step)
+        self.log.log("recovery", "started", self.session.control, step=step.step, action=step.action,
+                     reason=f"{stop.error_type}: {stop.observed}")
+        outcome = self.recoverer(RecoveryRequest(
+            step=step, value=fill(step.value, self.inputs) if step.value is not None else None,
+            allowed_values=tuple(self.inputs.values()), expected=stop.expected, observed=stop.observed,
+            error_type=stop.error_type))
+        self.llm_recovery_used = True
+        verified, why = (self._verify_recovered(step, outcome.extracted) if outcome.success
+                         else (False, outcome.detail))
+        note = f"step {step.step}: LLM recovery {'succeeded' if verified else 'failed'} ({outcome.actions} action(s))"
+        self.llm_used_for.append(f"recovering step {step.step} ({outcome.actions} action(s), "
+                                 f"{'succeeded' if verified else 'failed'})")
+        self.recoveries.append(note)
+        self.log.log("recovery", "succeeded" if verified else "failed", self.session.control, step=step.step,
+                     reason=why)
+        if verified:
+            # The recipe file is never changed automatically: flag it for a reviewer instead.
+            self.warnings.append(f"step {step.step} needed LLM recovery: the recipe needs review")
+        return verified
+
+    def _verify_recovered(self, step: Step, extracted: str | None) -> tuple[bool, str]:
+        """The LLM saying "done" is not proof. The step's own success criteria must hold."""
+        if step.action == "extract":
+            try:
+                self._keep_output(step, extracted or "")
+            except StopReplay:
+                return False, f"could not read a {step.parse} value for {step.save_as}"
+        if step.wait_for and self.browser.wait_for_any(step.wait_for.any_of, self.timeout) is None:
+            return False, "the step's wait_for did not appear"
+        return True, "the step's own checks passed"
 
     def _execute(self, start_at: int) -> StepStop:
         r = self.recipe
@@ -344,7 +406,8 @@ class Replayer:
                       recipe_version=self.recipe.version, recoveries=self.recoveries, warnings=self.warnings,
                       approvals=list(self.session.approvals),
                       human_interventions=list(self.session.human_interventions), log_file=str(folder.log_path),
-                      answered_by="recipe", llm_used_for=self.llm_used_for)
+                      answered_by="recipe", llm_used_for=self.llm_used_for,
+                      llm_recovery_used=self.llm_recovery_used)
         failure = None
         if stop.status in (RunStatus.FAILED, RunStatus.ESCALATED):
             if not self._evidence:
@@ -366,7 +429,8 @@ class Replayer:
 
 
 def replay(recipe: Recipe, raw_inputs: dict[str, str], session: Session,
-           operator: Operator | None = None, llm_used_for: list[str] | None = None) -> ReplayResult:
+           operator: Operator | None = None, llm_used_for: list[str] | None = None,
+           recoverer: Recoverer | None = None) -> ReplayResult:
     """Validate inputs, then run the recipe on the live session. INVALID_INPUT never touches the page.
 
     With an operator, hard failures go to human takeover on the same session (strict replay);
@@ -384,4 +448,4 @@ def replay(recipe: Recipe, raw_inputs: dict[str, str], session: Session,
     for name, spec in recipe.inputs.items():
         if spec.sensitive and name in values:
             session.logger.masker.add_value(values[name], field=name)
-    return Replayer(recipe, session, values, llm_used_for).run(operator)
+    return Replayer(recipe, session, values, llm_used_for, recoverer).run(operator)

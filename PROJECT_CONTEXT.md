@@ -283,6 +283,14 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
    - If it succeeds, replay continues from the next step and the recipe is flagged `needs_review`. The recipe file is never changed automatically.
    - If it fails, human takeover.
    - Every attempt is logged as evidence.
+   - Built in step 11 (`src/recovery/recovery.py`, seam in `src/replay/recovery_api.py`):
+     - The replay engine only knows a `Recoverer` callback (RecoveryRequest -> RecoveryOutcome); `src/replay` still imports no LLM code. `ask` passes `LLMRecoverer` (or `GiveUpRecoverer` with `--mock`); strict `replay` passes none.
+     - Eligible failures only: element_not_found, action_failed, wrong_page, wait_timeout, parse_error. Known bad states (server_error, session_expired, policy_blocked, other handler hard failures) and any `irreversible` step go straight to the human path. Once per step.
+     - Tools offered depend on the failed step's action (e.g. a type step: type_text + click to clear the way) plus `give_up`. Typing/selecting is limited to this run's input values. Extract may only read the step's own output.
+     - Actions go through `Session.perform` with mode `recovery`; there the guard is called with allow_risky=False, so a risky click is BLOCKED (rule risky_in_recovery), never offered for approval. At most `recovery_max_actions` (3).
+     - Recovery ends as soon as the step's OWN action (same kind, same value) succeeds; the model does not declare success. (Found with Groq: when asked to call step_done, the model kept repeating a correct action until the budget ran out.) Replay then verifies with the step's own checks (wait_for, or parsing the extracted value) before continuing at the next step.
+     - On success: `llm_recovery_used: true`, `llm_used_for` gets "recovering step N (k action(s), succeeded)", and a warning "step N needed LLM recovery: the recipe needs review". The recipe file is never changed.
+     - Checked with Groq on broken recipes: renamed search box, renamed Search button, renamed balance label each recovered with 1 action; a broken irreversible Confirm step was never given to the LLM.
 
 8. Safety layer (`src/safety/`)
    - Every action from discovery, replay, recovery, and the catalog passes through it before the browser runs it. Enforced in code, never only in a prompt.
