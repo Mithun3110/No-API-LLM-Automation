@@ -67,3 +67,10 @@ def logged_in(browser, bank_url):
     browser.page.click("input[type=submit]")
     browser.page.wait_for_url("**/search")
     return browser
+
+
+def pytest_collection_modifyitems(items):
+    """Mark every test that needs the bank or a browser, so `pytest -m "not browser"` is fast."""
+    for item in items:
+        if {"bank_url", "browser"} & set(getattr(item, "fixturenames", ())):
+            item.add_marker(pytest.mark.browser)

@@ -160,7 +160,7 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
 | Masking format | Member IDs `***45` (last 2 digits); balances, names, phones, addresses, passwords fully `***` | Regulated data; last digits help debugging |
 | LLM provider | Anthropic by default; provider-agnostic client, switchable to OpenAI via `.env`. The user has a Groq key in `.env` (Groq is OpenAI-compatible); confirm provider wiring in step 6 | Real key available from step 6 |
 | Git | Commit after each step once the user has tested and confirmed; the user pushes | Clear history, user stays in control |
-| Tests | pytest, focused on recipe schema, error classification, safety, replay against the fake bank | Tested where it counts |
+| Tests | pytest, focused on recipe schema, error classification, safety, replay against the fake bank. Browser tests run against a private bank (:5051, throwaway DB) and are auto-marked `browser`: `pytest` runs all (~2.5 min), `pytest -m "not browser"` runs the fast ones (<1 s). Step 12 added checks of the CLAUDE.md rules on the code itself (only src/browser imports Playwright; only the session gate clicks/types/selects/navigates; replay imports no LLM code; no key-like secrets in tracked files), of the config against the real bank (every text rule appears in the bank's pages; allowlist = every route except /logout and /_admin; exactly the data-changing buttons are risky; mock scripts valid), and an end-to-end no-leak scan of run folders after discovery, replay, a hard failure and a takeover | Tested where it counts |
 | Flask port | 5050 (not 5000) | macOS AirPlay Receiver uses port 5000 |
 | Test isolation | Tests start their own bank on port 5051 with a throwaway DB (`BANK_PORT`, `BANK_DB_PATH` env overrides) | Tests never touch the user's bank or data; always start from seed |
 
@@ -332,7 +332,7 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
     - `find` tries strategies in order; a strategy counts only if it matches exactly one VISIBLE element. `FindResult` records every attempt (e.g. `role=button "Search": 1 match`) and whether a backup was used (drift).
     - `compact_snapshot` strips the repeated names of layout containers (nested tables repeat all inner text at every level), about 40% smaller, so the LLM sees each text once.
     - Short action timeout (5s) so a click blocked by a popup fails fast with "blocked by <overlay>" for the replay engine to classify.
-    - Manual check: `python -m src.browser.demo [member_id]` (bank must be running).
+    - Manual check: `python -m src.handoff.demo` (through the safety gate; the step-3 `src.browser.demo` was removed in step 12 because it acted on the page without the gate).
 
 11. Logging and evidence (`src/logs/`)
     - Each run gets a folder: `runs/<run_id>/` with `log.jsonl`, `result.json`, screenshots, traces, and intervention requests.
