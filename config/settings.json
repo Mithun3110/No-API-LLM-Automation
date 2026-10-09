@@ -8,6 +8,7 @@
   "recovery_max_actions": 3,
   "max_takeovers": 3,
   "headless": false,
+  "action_delay_s": 1.5,
   "llm_models": {
     "groq": "openai/gpt-oss-120b",
     "anthropic": "claude-sonnet-5-5",

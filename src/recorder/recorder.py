@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.agent import AgentStep, DiscoveryResult
+from src.catalog.store import write_recipe
 from src.models import Recipe
 from src.models.recipe import (
     CssStrategy, LabelStrategy, NearTextStrategy, RoleStrategy, Strategy, TextStrategy,
@@ -102,11 +103,9 @@ class _Builder:
             "default_on_unknown": {"type": "hard_failure", "then": "escalate"},
         }
         recipe = Recipe.model_validate(data)  # every schema cross-check runs before anything is written
-        text = json.dumps(recipe.model_dump(mode="json", exclude_none=True), indent=2)
-        self._check_no_real_values(text)
-        recipes_dir.mkdir(parents=True, exist_ok=True)
+        self._check_no_real_values(json.dumps(recipe.model_dump(mode="json", exclude_none=True)))
         path = recipes_dir / recipe.file_name
-        path.write_text(text + "\n")
+        write_recipe(recipe, path)
         return Recorded(recipe, path, self.skipped)
 
     def _entry_step(self, heading: str) -> dict:

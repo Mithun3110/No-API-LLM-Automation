@@ -322,7 +322,9 @@ class Discovery:
         return result
 
     def _run_result(self, r: DiscoveryResult, evidence: list[str]) -> RunResult:
-        common = dict(run_id=self.session.logger.run_id, mode="discover",
+        decisions = 1 + sum(1 for st in self.steps if st.source == "agent")  # define_task + one per turn
+        common = dict(run_id=self.session.logger.run_id, mode="discover", answered_by="llm_discovery",
+                      llm_used_for=[f"driving the UI live ({self.llm.model}, {decisions} decisions)"],
                       recipe_id=r.task.recipe_id if r.task else None,
                       approvals=list(self.session.approvals),
                       human_interventions=list(self.session.human_interventions),

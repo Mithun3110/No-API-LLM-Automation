@@ -72,8 +72,9 @@ class ReplayResult:
 
 
 class Replayer:
-    def __init__(self, recipe: Recipe, session: Session, inputs: dict[str, str]):
+    def __init__(self, recipe: Recipe, session: Session, inputs: dict[str, str], llm_used_for: list[str] | None = None):
         self.recipe = recipe
+        self.llm_used_for = list(llm_used_for or [])  # decided by the caller (e.g. matching); replay adds none
         self.session = session
         self.browser = session.browser
         self.log = session.logger
@@ -342,7 +343,8 @@ class Replayer:
         common = dict(run_id=self.log.run_id, mode="replay", recipe_id=self.recipe.recipe_id,
                       recipe_version=self.recipe.version, recoveries=self.recoveries, warnings=self.warnings,
                       approvals=list(self.session.approvals),
-                      human_interventions=list(self.session.human_interventions), log_file=str(folder.log_path))
+                      human_interventions=list(self.session.human_interventions), log_file=str(folder.log_path),
+                      answered_by="recipe", llm_used_for=self.llm_used_for)
         failure = None
         if stop.status in (RunStatus.FAILED, RunStatus.ESCALATED):
             if not self._evidence:
@@ -364,7 +366,7 @@ class Replayer:
 
 
 def replay(recipe: Recipe, raw_inputs: dict[str, str], session: Session,
-           operator: Operator | None = None) -> ReplayResult:
+           operator: Operator | None = None, llm_used_for: list[str] | None = None) -> ReplayResult:
     """Validate inputs, then run the recipe on the live session. INVALID_INPUT never touches the page.
 
     With an operator, hard failures go to human takeover on the same session (strict replay);
@@ -374,11 +376,12 @@ def replay(recipe: Recipe, raw_inputs: dict[str, str], session: Session,
     if errors:
         result = RunResult(status=RunStatus.INVALID_INPUT, run_id=session.logger.run_id, mode="replay",
                            recipe_id=recipe.recipe_id, recipe_version=recipe.version, message="; ".join(errors),
-                           log_file=str(session.logger.folder.log_path))
+                           log_file=str(session.logger.folder.log_path), answered_by="recipe",
+                           llm_used_for=list(llm_used_for or []))
         session.logger.log("replay", "INVALID_INPUT", session.control, reason=result.message)
         session.logger.write_result(result)
         return ReplayResult(result)
     for name, spec in recipe.inputs.items():
         if spec.sensitive and name in values:
             session.logger.masker.add_value(values[name], field=name)
-    return Replayer(recipe, session, values).run(operator)
+    return Replayer(recipe, session, values, llm_used_for).run(operator)

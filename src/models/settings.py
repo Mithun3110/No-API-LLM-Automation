@@ -18,6 +18,7 @@ class Settings(StrictModel):
     recovery_max_actions: int = Field(default=3, ge=1)    # bounded LLM recovery budget
     max_takeovers: int = Field(default=3, ge=0)           # human takeovers per run before giving up
     headless: bool = False                                # visible, so a human can take over
+    action_delay_s: float = Field(default=1.5, ge=0, le=10)  # pause before each action when visible, to watch
     entry_path: str = "/search"                           # where discovery starts after login
     discovery_timeout_s: float = Field(default=300, gt=0)
     # Model per provider. The provider itself comes from LLM_PROVIDER in .env;

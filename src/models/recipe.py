@@ -35,6 +35,13 @@ class Provenance(StrictModel):
     recorded_at: datetime
 
 
+class Approval(StrictModel):
+    """Who approved this version for production use, when, and on what basis."""
+    approved_by: str
+    approved_at: datetime
+    basis: str  # "manual_review" (approve command) or "successful_replay:<run_id>" (ask)
+
+
 class InputSpec(StrictModel):
     description: str
     type: ValueType
@@ -286,6 +293,7 @@ class Recipe(StrictModel):
     needs_review: bool = False
     app: AppInfo
     provenance: Provenance
+    approval: Approval | None = None
 
     inputs: dict[str, InputSpec]
     outputs: dict[str, OutputSpec]

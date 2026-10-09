@@ -41,13 +41,14 @@ TARGETED_ACTIONS = ("click", "type", "select", "extract")
 
 class Session:
     def __init__(self, browser: Browser, guard: SafetyGuard, logger: RunLogger, settings: Settings,
-                 approver: Approver = reject_all):
+                 approver: Approver = reject_all, action_delay_s: float = 0):
         self.browser = browser
         self.guard = guard
         self.logger = logger
         self.settings = settings
         self.approver = approver
         self._control = ControlState.AUTOMATION
+        self.action_delay_s = action_delay_s  # pause before each action so a person can follow along
         self.keep_trace = False  # set True to keep the trace even when the run did not raise
         self.approvals: list[str] = []  # every approval decision this run, masked, for the result
         self.takeovers = 0                       # human takeovers so far (bounded by settings.max_takeovers)
@@ -71,6 +72,10 @@ class Session:
         if self._control != ControlState.AUTOMATION:
             # Never silently skipped: acting while the human has control is a programming error.
             raise ControlError(f"automation tried to {action.kind} while control is {self._control.value}")
+
+        # Pace visible runs so a person can follow each move (login runs at full speed).
+        if self.action_delay_s and action.kind != "wait" and action.mode != "session":
+            self.browser.wait(self.action_delay_s)
 
         # Find first (read-only): the risk check needs to know which element this is.
         found = None
@@ -209,10 +214,12 @@ def open_session(
     headless: bool | None = None,
     echo: bool = True,
     slow_mo_ms: int = 0,
+    action_delay_s: float | None = None,
 ) -> Iterator[Session]:
     """Open browser, start tracing, sign in, and hand over a ready session. Cleans up on exit.
 
-    slow_mo_ms delays every browser action, so a person can follow along (demos only).
+    slow_mo_ms delays every low-level browser operation (demos). action_delay_s pauses before each
+    action; by default settings.action_delay_s when the window is visible, 0 when headless.
 
     The trace is kept only if the run failed (an exception left the block, or the caller
     set session.keep_trace = True), because traces are large and most runs succeed.
@@ -228,9 +235,12 @@ def open_session(
     folder = RunFolder(runs_dir=runs_dir)
     masker = Masker(policy.mask_fields, secrets=[username, password])
     logger = RunLogger(folder, masker, echo=echo)
-    browser = Browser(headless=settings.headless if headless is None else headless, slow_mo_ms=slow_mo_ms)
+    headless = settings.headless if headless is None else headless
+    if action_delay_s is None:
+        action_delay_s = 0 if headless else settings.action_delay_s
+    browser = Browser(headless=headless, slow_mo_ms=slow_mo_ms)
     browser.start_trace()
-    session = Session(browser, SafetyGuard(policy), logger, settings, approver)
+    session = Session(browser, SafetyGuard(policy), logger, settings, approver, action_delay_s)
     failed = False
     try:
         logger.log("session", "started", session.control, action="open", reason=f"{mode} run")

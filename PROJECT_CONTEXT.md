@@ -133,7 +133,7 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
 | No API key yet | Mock LLM mode built first | Reviewers can run without a key; clean seam |
 | Recipe format | JSON, schema defined with Pydantic | Readable by humans and agents; validated |
 | Recipes saved | Only after a successful discovery run, status `draft` | Never save a failed or partial flow |
-| Approval | `draft` then `approved` via a command | Banks should not run unreviewed automation |
+| Approval | `draft` then `approved` via `approve <id>` (shows a review summary), OR right after `ask` replays a draft successfully: "Approve it now?" (option B). Recipes with `needs_review` (human steps) are only approved through `approve`. Every approval records `approved_by`, `approved_at`, `basis` (`manual_review` or `successful_replay:<run_id>`) | Banks should not run unreviewed automation; a draft that replayed on its own is the strongest evidence for approval |
 | Error triggers | Special member IDs for data errors plus a config setting for system errors | Realistic and repeatable demos |
 | Random errors | Only when triggered, never random | Repeatable evidence |
 | Agent step limit | 20 | Stops runaway loops |
@@ -173,7 +173,14 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
 1. Fake bank website (`bank_app/`)
    The target. Knows nothing about AI. See Part F.
 
-2. Command line (`run.py`)
+2. Command line (`run.py`) (built in step 10; replaces the temporary `python -m src.agent` / `python -m src.replay` runners)
+   - Results that need no browser (no match, draft refused, invalid input) still get a run folder with `log.jsonl` and `result.json`.
+   - Exit code 0 for SUCCESS or BUSINESS_OUTCOME (both valid answers), 1 otherwise.
+   - Every run says how it was answered, before the browser opens and in the result: `answered_by` (recipe = deterministic replay with no LLM decisions on the website, or llm_discovery = the LLM drove the UI live) and `llm_used_for` (matching only, nothing at all for `--recipe`, or the number of live decisions).
+   - With a person at the keyboard: risky steps ask yes/no, hard failures and stuck discovery hand over the browser; `--no-human` disables that. Without a terminal, every prompt is answered "no".
+   - Visible runs pause `settings.action_delay_s` (1.5 s) before each action so a person can follow (login is not paced); headless runs and `--fast` do not pause. `--slow` additionally slows every low-level browser operation.
+   - Demo/testing flags on `ask` and `replay`: `--inject <popup|slow_page|session_expired|server_error> --at-step N`. `--slow`, `--auto-close` on browser commands.
+   - Imports of LLM code live inside the functions that need them; a test runs `replay --recipe` in a fresh interpreter and checks that no `src.agent`, `openai` or `anthropic` module was loaded.
    - `ask "<request>"`: main command.
    - `replay "<request>"`: strict, recipe-only execution (LLM or mock keyword rules only match the request).
    - `replay --recipe <id> --input <name>=<value> ...`: pure deterministic replay, no LLM anywhere. Used in the README demo.
@@ -188,6 +195,13 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
    - Gives the LLM a menu (each recipe's id, name, description, inputs, outputs). Each recipe is presented as a tool; the LLM calls one with typed arguments, or calls `no_match`.
    - Validates the extracted inputs against the recipe's types and patterns before anything runs. Invalid input returns `INVALID_INPUT`.
    - In mock mode, matching is done with simple keyword rules.
+   - Built in step 10: `src/catalog/store.py` (loading, versions, approval; imports NO LLM code) and `src/catalog/matcher.py` (LLM or mock matching).
+     - Broken or misnamed recipe files are reported by `list`, never fatal and never silently ignored.
+     - Active version = latest approved, else latest draft. A newer draft does not replace an approved version until it is approved.
+     - LLM matching: each active recipe becomes a tool (`member.lookup_savings_balance` -> `member__lookup_savings_balance`) whose parameters are the recipe inputs (with their regex patterns in the descriptions), plus `no_match(reason, missing_value)`. The LLM's arguments are then validated against the recipe (INVALID_INPUT on mismatch).
+     - `missing_value=true` (a recipe fits but the request lacks a value, e.g. no deposit amount): `ask` returns INVALID_INPUT naming the missing value instead of discovering a duplicate recipe.
+     - Mock matching reuses `config/mock_scripts` (`goal_keywords` + `goal_pattern`; named groups become inputs; the script's `define_task.recipe_id` names the recipe).
+     - Checked with Groq: different wordings map to the right recipe and inputs; "transfer" -> no capability; missing values -> missing_value.
 
 4. Discovery agent (`src/agent/`)
    - First, the LLM defines the task: a proposed recipe id, name, and description; the inputs it will use, with their values from the goal (e.g. `member_id = 12345`); and the outputs it must return. This is how the recorder later knows which typed values become placeholders.
@@ -515,6 +529,8 @@ Locator rules:
   },
   "recoveries": ["<fixes applied>"],
   "llm_recovery_used": false,
+  "answered_by": "<recipe | llm_discovery>",
+  "llm_used_for": ["<every LLM involvement, e.g. matching the request to this recipe; empty for replay --recipe>"],
   "human_interventions": ["<what the human did, masked>"],
   "approvals": ["<risky actions approved or rejected>"],
   "warnings": ["<e.g. backup locator used at step 3>"],

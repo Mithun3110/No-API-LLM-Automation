@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 from enum import Enum
+from typing import Literal
 
 from pydantic import Field, model_validator
 
@@ -44,6 +45,10 @@ class RunResult(StrictModel):
     message: str | None = None  # one human-readable line, e.g. why the input was invalid
     recoveries: list[str] = []
     llm_recovery_used: bool = False
+    # How the request was answered: a recorded recipe replayed with no LLM decisions, or the LLM
+    # driving the UI live. llm_used_for lists every LLM involvement, e.g. ["matching the request"].
+    answered_by: Literal["recipe", "llm_discovery"] | None = None
+    llm_used_for: list[str] = []
     human_interventions: list[str] = []
     approvals: list[str] = []
     warnings: list[str] = []
