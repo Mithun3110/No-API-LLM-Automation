@@ -1,0 +1,25 @@
+{
+  "status": "SUCCESS",
+  "run_id": "20261010T022711Z-f098",
+  "mode": "discover",
+  "recipe_id": "member.open_money_market_account",
+  "recipe_version": null,
+  "outputs": {
+    "account_number": "***"
+  },
+  "outcome_code": null,
+  "failure": null,
+  "message": "*** account opened for member ***99 with confirmation ***.",
+  "recoveries": [],
+  "llm_recovery_used": false,
+  "answered_by": "llm_discovery",
+  "llm_used_for": [
+    "driving the UI live (openai/gpt-oss-120b, 10 decisions)"
+  ],
+  "human_interventions": [],
+  "approvals": [
+    "approved: click button \"Confirm\" on /member/***99/open-account"
+  ],
+  "warnings": [],
+  "log_file": "evidence/risky_action_approval/approved/log.jsonl"
+}

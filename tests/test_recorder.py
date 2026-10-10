@@ -109,12 +109,21 @@ def test_failed_run_is_never_recorded(discover_and_record):
             {"tool": "ask_human", "args": {"reason": "stuck"}}]))
 
 
-def test_sensitive_constant_is_refused(discover_and_record):
+def test_sensitive_value_not_from_the_goal_is_refused(discover_and_record):
     calls = json.loads(json.dumps(load_mock(LOOKUP).calls))
-    # The model types a member ID it did not declare as an input: it would be stored as a constant.
-    calls[0]["args"]["inputs"] = []
+    # The model types a phone number that is in neither the goal nor the inputs: it would be stored.
+    calls.insert(2, {"tool": "type_text", "args": {"name": "Member ID", "text": "555-123-4567", "reason": "x"}})
+    calls.insert(3, {"tool": "type_text", "args": {"name": "Member ID", "text": "12345", "reason": "x"}})
     with pytest.raises(RecorderError, match="would store a real value"):
-        discover_and_record("Look up member 12345 and read their savings balance", llm=MockLLM(calls))
+        discover_and_record(LOOKUP, llm=MockLLM(calls))
+
+
+def test_undeclared_goal_value_becomes_an_input_not_a_constant(discover_and_record):
+    calls = json.loads(json.dumps(load_mock(LOOKUP).calls))
+    calls[0]["args"]["inputs"] = []  # the model forgot the member ID entirely
+    result, saved = discover_and_record(LOOKUP, llm=MockLLM(calls))
+    assert result.auto_inputs == ["member_id"] and saved.recipe.needs_review
+    assert "12345" not in saved.path.read_text()
 
 
 def test_next_version(tmp_path):
@@ -122,3 +131,20 @@ def test_next_version(tmp_path):
     (tmp_path / "a.b@1.0.0.json").write_text("{}")
     (tmp_path / "a.b@1.4.0.json").write_text("{}")
     assert next_version("a.b", tmp_path) == "1.5.0"
+
+
+def test_goal_values_the_model_forgot_become_inputs(discover_and_record):
+    """Seen with the real model: it declared only member_id, then typed the account type and the
+    deposit from the goal. Those must become inputs (masked, reviewed), never fixed values."""
+    goal = "Open a Money Market account for member 20481 with an initial deposit of $15.00"
+    calls = json.loads(json.dumps(load_mock(goal).calls))
+    calls[0]["args"]["inputs"] = [i for i in calls[0]["args"]["inputs"] if i["name"] == "member_id"]
+    result, saved = discover_and_record(goal, llm=MockLLM(calls), approve=True)
+    assert result.auto_inputs == ["account_type", "initial_deposit"]
+    r = saved.recipe
+    assert set(r.inputs) == {"member_id", "account_type", "initial_deposit"} and r.needs_review
+    assert r.inputs["initial_deposit"].type == "currency" and r.inputs["initial_deposit"].sensitive
+    assert "15.00" not in saved.path.read_text() and "Money Market\"" not in json.dumps(
+        [s.value for s in r.steps if s.value])
+    log = next((saved.path.parent.parent / "runs").glob(f"{r.provenance.recorded_from_run}/log.jsonl")).read_text()
+    assert "15.00" not in log  # masked before the typing action was logged

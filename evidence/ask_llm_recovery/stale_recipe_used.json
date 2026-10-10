@@ -13,13 +13,13 @@
     "entry_url": "http://localhost:5050/search"
   },
   "provenance": {
-    "recorded_from_run": "20261008T221051Z-2f6a",
-    "recorded_at": "2026-10-08T22:11:02.345060Z"
+    "recorded_from_run": "20261010T015708Z-09d3",
+    "recorded_at": "2026-10-10T01:57:13.525043Z"
   },
   "approval": {
     "approved_by": "mithundineshkumar",
-    "approved_at": "2026-10-09T00:10:54.631154Z",
-    "basis": "successful_replay:20261009T001045Z-05d8"
+    "approved_at": "2026-10-10T01:57:13.585465Z",
+    "basis": "manual_review"
   },
   "inputs": {
     "member_id": {
@@ -54,7 +54,7 @@
       "wait_for": {
         "any_of": [
           {
-            "text": "Member Search"
+            "heading": "Member Search"
           }
         ]
       }
@@ -64,7 +64,7 @@
       "description": "Enter member ID to search",
       "source": "agent",
       "expect_page": {
-        "text_visible": "Member Search"
+        "heading": "Member Search"
       },
       "action": "type",
       "target": {
@@ -72,16 +72,8 @@
           {
             "by": "role",
             "role": "textbox",
-            "name": "Member ID",
+            "name": "Member Number",
             "exact": true
-          },
-          {
-            "by": "label",
-            "text": "Member ID"
-          },
-          {
-            "by": "css",
-            "value": "input[name=\"f1\"]"
           }
         ],
         "why": "role textbox \"Member ID\": semantic, survives layout and markup changes; label \"Member ID\": a real <label> is linked to the field; css input[name=\"f1\"]: depends on markup, last resort. Each was verified to match exactly this element when recorded."
@@ -94,7 +86,7 @@
       "description": "Search for member ID {member_id}",
       "source": "agent",
       "expect_page": {
-        "text_visible": "Member Search"
+        "heading": "Member Search"
       },
       "action": "click",
       "target": {
@@ -116,7 +108,7 @@
       "wait_for": {
         "any_of": [
           {
-            "text": "Member Detail"
+            "heading": "Member Detail"
           }
         ]
       }
@@ -126,7 +118,7 @@
       "description": "Read the member's savings balance",
       "source": "agent",
       "expect_page": {
-        "text_visible": "Member Detail"
+        "heading": "Member Detail"
       },
       "action": "extract",
       "target": {
@@ -150,7 +142,7 @@
   ],
   "success_check": {
     "description": "On the final page with every output read.",
-    "text_visible": "Member Detail",
+    "heading": "Member Detail",
     "outputs_present": [
       "savings_balance"
     ]

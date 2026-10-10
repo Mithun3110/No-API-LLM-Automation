@@ -447,7 +447,12 @@ class Browser:
             self._context.tracing.stop()
             return None
         path.parent.mkdir(parents=True, exist_ok=True)
-        self._context.tracing.stop(path=str(path))
+        try:
+            self._context.tracing.stop(path=str(path))
+        except PlaywrightError as e:
+            # e.g. interrupted with Ctrl+C mid-save. Losing the trace must not hide the real error.
+            print(f"  warning: trace not saved ({first_line(e)})")
+            return None
         return path
 
 

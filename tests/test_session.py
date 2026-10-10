@@ -49,12 +49,37 @@ def test_login_and_password_never_logged(make_session):
     assert "demo123" not in raw and '"action":"login"' in raw and '"outcome":"ok"' in raw
 
 
-def test_wrong_password_raises_and_keeps_trace(make_session, tmp_path):
+def test_wrong_password_raises_and_records_no_trace(make_session, tmp_path):
     with pytest.raises(SessionError, match="rejected the credentials"):
         with make_session(password="wrong-password"):
             pass
-    trace = next(tmp_path.glob("*/trace.zip"))  # failed runs keep their trace
-    assert trace.stat().st_size > 0
+    assert not list(tmp_path.glob("*/trace.zip"))  # tracing starts only after a successful login
+
+
+def test_trace_never_contains_the_password(make_session, tmp_path):
+    import zipfile
+    with make_session() as s:
+        s.keep_trace = True
+        s.perform(Action("navigate", url="/search"))
+    trace = next(tmp_path.glob("*/trace.zip"))
+    with zipfile.ZipFile(trace) as z:
+        assert not any(b"demo123" in z.read(name) for name in z.namelist())
+
+
+def test_login_retries_once_after_a_hiccup(make_session, monkeypatch):
+    from src.handoff.session import Session
+    original, calls = Session.perform, {"n": 0}
+
+    def flaky(self, action):
+        if action.reason == "enter password" and calls["n"] == 0:
+            calls["n"] += 1
+            from src.handoff import ActionOutcome
+            return ActionOutcome("failed", "simulated: field not editable", performed=None)
+        return original(self, action)
+    monkeypatch.setattr(Session, "perform", flaky)
+    with make_session() as s:
+        assert s.browser.has_heading("Member Search")
+        assert any(e.outcome == "retry" for e in log_of(s))
 
 
 def test_successful_run_does_not_keep_trace(make_session, tmp_path):

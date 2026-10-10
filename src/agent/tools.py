@@ -106,9 +106,22 @@ ACTION_TOOLS = {
 
 
 def tool_specs(tools: dict[str, type[StrictModel]]) -> list[dict]:
-    """Provider-neutral tool list: name, description, JSON schema of the arguments."""
-    return [{"name": name, "description": (model.__doc__ or "").strip(), "parameters": model.model_json_schema()}
-            for name, model in tools.items()]
+    """Provider-neutral tool list: name, description, JSON schema of the arguments.
+
+    The "required" lists are removed from the schema the model sees. Some providers (Groq) reject a
+    call that misses a required field on THEIR side, so the model never learns what was wrong.
+    Our own Pydantic validation stays the authority and turns a missing field into precise feedback.
+    """
+    return [{"name": name, "description": (model.__doc__ or "").strip(),
+             "parameters": _without_required(model.model_json_schema())} for name, model in tools.items()]
+
+
+def _without_required(schema):
+    if isinstance(schema, dict):
+        return {k: _without_required(v) for k, v in schema.items() if k != "required"}
+    if isinstance(schema, list):
+        return [_without_required(v) for v in schema]
+    return schema
 
 
 def to_action(args: StrictModel, step: int) -> Action | None:

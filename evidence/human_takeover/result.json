@@ -1,0 +1,23 @@
+{
+  "status": "SUCCESS",
+  "run_id": "20261010T020208Z-69a7",
+  "mode": "replay",
+  "recipe_id": "member.lookup_savings_balance",
+  "recipe_version": "1.0.0",
+  "outputs": {
+    "savings_balance": "***"
+  },
+  "outcome_code": null,
+  "failure": null,
+  "message": "all steps done and success check passed",
+  "recoveries": [],
+  "llm_recovery_used": false,
+  "answered_by": "recipe",
+  "llm_used_for": [],
+  "human_interventions": [
+    "takeover 1 (hard_failure): click button \"Search\" on /search -> resume"
+  ],
+  "approvals": [],
+  "warnings": [],
+  "log_file": "evidence/human_takeover/log.jsonl"
+}

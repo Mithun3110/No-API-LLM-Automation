@@ -1,0 +1,425 @@
+{
+  "schema_version": "1.0",
+  "recipe_id": "member.open_money_market_account",
+  "name": "member.open_money_market_account",
+  "description": "Open a {account_type} account for a member with an initial deposit.",
+  "version": "1.0.0",
+  "status": "draft",
+  "needs_review": false,
+  "app": {
+    "name": "CoreServ Teller",
+    "version": "4.2",
+    "surface": "web",
+    "entry_url": "http://localhost:5050/search"
+  },
+  "provenance": {
+    "recorded_from_run": "20261010T022711Z-f098",
+    "recorded_at": "2026-10-10T02:27:49.369849Z"
+  },
+  "inputs": {
+    "member_id": {
+      "description": "member_id",
+      "type": "string",
+      "required": true,
+      "sensitive": true
+    },
+    "account_type": {
+      "description": "account_type",
+      "type": "string",
+      "required": true,
+      "sensitive": true
+    },
+    "initial_deposit": {
+      "description": "initial_deposit",
+      "type": "currency",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "outputs": {
+    "account_number": {
+      "description": "account_number",
+      "type": "string",
+      "sensitive": true
+    }
+  },
+  "outcomes": {
+    "SUCCESS": "The goal was completed and outputs were read.",
+    "MEMBER_NOT_FOUND": "No member has this ID.",
+    "PERMISSION_DENIED": "The signed-in user may not view this member.",
+    "ACCOUNT_ALREADY_EXISTS": "The member already has this account type.",
+    "VALIDATION_ERROR": "The app rejected a value on a form."
+  },
+  "steps": [
+    {
+      "step": 1,
+      "description": "Open the Member Search page.",
+      "source": "agent",
+      "action": "navigate",
+      "url": "/search",
+      "risk": "safe",
+      "wait_for": {
+        "any_of": [
+          {
+            "heading": "Member Search"
+          }
+        ]
+      }
+    },
+    {
+      "step": 2,
+      "description": "Enter member ID for search",
+      "source": "agent",
+      "expect_page": {
+        "heading": "Member Search"
+      },
+      "action": "type",
+      "target": {
+        "strategies": [
+          {
+            "by": "role",
+            "role": "textbox",
+            "name": "Member ID",
+            "exact": true
+          },
+          {
+            "by": "label",
+            "text": "Member ID"
+          },
+          {
+            "by": "css",
+            "value": "input[name=\"f1\"]"
+          }
+        ],
+        "why": "role textbox \"Member ID\": semantic, survives layout and markup changes; label \"Member ID\": a real <label> is linked to the field; css input[name=\"f1\"]: depends on markup, last resort. Each was verified to match exactly this element when recorded."
+      },
+      "value": "{{member_id}}",
+      "risk": "safe"
+    },
+    {
+      "step": 3,
+      "description": "Search for member {member_id}",
+      "source": "agent",
+      "expect_page": {
+        "heading": "Member Search"
+      },
+      "action": "click",
+      "target": {
+        "strategies": [
+          {
+            "by": "role",
+            "role": "button",
+            "name": "Search",
+            "exact": true
+          },
+          {
+            "by": "css",
+            "value": "input[type=\"submit\"][value=\"Search\"]"
+          }
+        ],
+        "why": "role button \"Search\": semantic, survives layout and markup changes; css input[type=\"submit\"][value=\"Search\"]: depends on markup, last resort. Each was verified to match exactly this element when recorded."
+      },
+      "risk": "safe",
+      "wait_for": {
+        "any_of": [
+          {
+            "heading": "Member Detail"
+          }
+        ]
+      }
+    },
+    {
+      "step": 4,
+      "description": "Navigate to open account form",
+      "source": "agent",
+      "expect_page": {
+        "heading": "Member Detail"
+      },
+      "action": "click",
+      "target": {
+        "strategies": [
+          {
+            "by": "role",
+            "role": "link",
+            "name": "Open Sub-Account",
+            "exact": true
+          },
+          {
+            "by": "text",
+            "text": "Open Sub-Account"
+          }
+        ],
+        "why": "role link \"Open Sub-Account\": semantic, survives layout and markup changes; visible text \"Open Sub-Account\". Each was verified to match exactly this element when recorded."
+      },
+      "risk": "safe",
+      "wait_for": {
+        "any_of": [
+          {
+            "heading": "Open Sub-Account"
+          }
+        ]
+      }
+    },
+    {
+      "step": 5,
+      "description": "Select {account_type} account type",
+      "source": "agent",
+      "expect_page": {
+        "heading": "Open Sub-Account"
+      },
+      "action": "select",
+      "target": {
+        "strategies": [
+          {
+            "by": "role",
+            "role": "combobox",
+            "name": "Account Type",
+            "exact": true
+          },
+          {
+            "by": "label",
+            "text": "Account Type"
+          },
+          {
+            "by": "css",
+            "value": "select[name=\"f1\"]"
+          }
+        ],
+        "why": "role combobox \"Account Type\": semantic, survives layout and markup changes; label \"Account Type\": a real <label> is linked to the field; css select[name=\"f1\"]: depends on markup, last resort. Each was verified to match exactly this element when recorded."
+      },
+      "value": "{{account_type}}",
+      "risk": "safe"
+    },
+    {
+      "step": 6,
+      "description": "Enter initial deposit amount",
+      "source": "agent",
+      "expect_page": {
+        "heading": "Open Sub-Account"
+      },
+      "action": "type",
+      "target": {
+        "strategies": [
+          {
+            "by": "role",
+            "role": "textbox",
+            "name": "Initial Deposit",
+            "exact": true
+          },
+          {
+            "by": "label",
+            "text": "Initial Deposit"
+          },
+          {
+            "by": "css",
+            "value": "input[name=\"f2\"]"
+          }
+        ],
+        "why": "role textbox \"Initial Deposit\": semantic, survives layout and markup changes; label \"Initial Deposit\": a real <label> is linked to the field; css input[name=\"f2\"]: depends on markup, last resort. Each was verified to match exactly this element when recorded."
+      },
+      "value": "{{initial_deposit}}",
+      "risk": "safe"
+    },
+    {
+      "step": 7,
+      "description": "Submit account opening",
+      "source": "agent",
+      "expect_page": {
+        "heading": "Open Sub-Account"
+      },
+      "action": "click",
+      "target": {
+        "strategies": [
+          {
+            "by": "role",
+            "role": "button",
+            "name": "Continue",
+            "exact": true
+          },
+          {
+            "by": "css",
+            "value": "input[type=\"submit\"][value=\"Continue\"]"
+          }
+        ],
+        "why": "role button \"Continue\": semantic, survives layout and markup changes; css input[type=\"submit\"][value=\"Continue\"]: depends on markup, last resort. Each was verified to match exactly this element when recorded."
+      },
+      "risk": "safe",
+      "wait_for": {
+        "any_of": [
+          {
+            "heading": "Confirm New Account"
+          }
+        ]
+      }
+    },
+    {
+      "step": 8,
+      "description": "Confirm opening {account_type} account",
+      "source": "agent",
+      "expect_page": {
+        "heading": "Confirm New Account"
+      },
+      "action": "click",
+      "target": {
+        "strategies": [
+          {
+            "by": "role",
+            "role": "button",
+            "name": "Confirm",
+            "exact": true
+          },
+          {
+            "by": "css",
+            "value": "input[type=\"submit\"][value=\"Confirm\"]"
+          }
+        ],
+        "why": "role button \"Confirm\": semantic, survives layout and markup changes; css input[type=\"submit\"][value=\"Confirm\"]: depends on markup, last resort. Each was verified to match exactly this element when recorded."
+      },
+      "risk": "irreversible",
+      "wait_for": {
+        "any_of": [
+          {
+            "heading": "Transaction Complete"
+          }
+        ]
+      }
+    },
+    {
+      "step": 9,
+      "description": "Extract the new account number from confirmation",
+      "source": "agent",
+      "expect_page": {
+        "heading": "Transaction Complete"
+      },
+      "action": "extract",
+      "target": {
+        "strategies": [
+          {
+            "by": "near_text",
+            "anchor": "Confirmation Number",
+            "relation": "right_of"
+          },
+          {
+            "by": "css",
+            "value": "td:has-text('Confirmation Number') + td"
+          }
+        ],
+        "why": "next to the stable label \"Confirmation Number\" (the value itself changes per record); css td:has-text('Confirmation Number') + td: depends on markup, last resort. Each was verified to match exactly this element when recorded."
+      },
+      "save_as": "account_number",
+      "parse": "text",
+      "risk": "safe"
+    }
+  ],
+  "success_check": {
+    "description": "On the final page with every output read.",
+    "heading": "Transaction Complete",
+    "outputs_present": [
+      "account_number"
+    ]
+  },
+  "error_handlers": [
+    {
+      "id": "member_not_found",
+      "description": "No member with that ID.",
+      "scope": "any_step",
+      "when": {
+        "text": "No member found."
+      },
+      "type": "business_outcome",
+      "result": "MEMBER_NOT_FOUND"
+    },
+    {
+      "id": "permission_denied",
+      "description": "Restricted member.",
+      "scope": "any_step",
+      "when": {
+        "text": "You are not authorized to view this account."
+      },
+      "type": "business_outcome",
+      "result": "PERMISSION_DENIED"
+    },
+    {
+      "id": "account_already_exists",
+      "description": "Duplicate account type.",
+      "scope": "any_step",
+      "when": {
+        "text": "This account already exists."
+      },
+      "type": "business_outcome",
+      "result": "ACCOUNT_ALREADY_EXISTS"
+    },
+    {
+      "id": "validation_error",
+      "description": "A form value was rejected.",
+      "scope": "any_step",
+      "when": {
+        "text": "Please correct the following:"
+      },
+      "type": "business_outcome",
+      "result": "VALIDATION_ERROR"
+    },
+    {
+      "id": "notice_popup",
+      "description": "Maintenance Notice dialog blocks the page.",
+      "scope": "any_step",
+      "when": {
+        "dialog": "Notice"
+      },
+      "type": "recoverable",
+      "fix": {
+        "action": "click",
+        "target": {
+          "strategies": [
+            {
+              "by": "role",
+              "role": "button",
+              "name": "OK",
+              "exact": true
+            }
+          ],
+          "why": "The dialog's only button."
+        }
+      },
+      "max_attempts": 3
+    },
+    {
+      "id": "slow_page",
+      "description": "The page is still loading.",
+      "scope": "any_step",
+      "when": {
+        "wait_timed_out": true
+      },
+      "type": "recoverable",
+      "fix": {
+        "action": "wait",
+        "seconds": 5.0
+      },
+      "max_attempts": 3
+    },
+    {
+      "id": "session_expired",
+      "description": "Signed out by the app.",
+      "scope": "any_step",
+      "when": {
+        "text": "Session expired"
+      },
+      "type": "hard_failure",
+      "then": "escalate"
+    },
+    {
+      "id": "server_error",
+      "description": "The app crashed on this request.",
+      "scope": "any_step",
+      "when": {
+        "text": "Something went wrong."
+      },
+      "type": "hard_failure",
+      "then": "escalate"
+    }
+  ],
+  "default_on_unknown": {
+    "type": "hard_failure",
+    "then": "escalate"
+  }
+}

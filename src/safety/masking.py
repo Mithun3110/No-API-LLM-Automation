@@ -17,6 +17,7 @@ PATTERNS = [
     (re.compile(r"\b\d{8,}\b"), MASK),                                # account numbers
     (re.compile(r"\b\d{3}-\d{3}-\d{4}\b"), MASK),                     # phone numbers
     (re.compile(r"-?\$\s?\d[\d,]*(?:\.\d{2})?"), "$" + MASK),          # money
+    (re.compile(r"(?<![\d.])\d[\d,]*\.\d{2}(?![\d.])"), MASK),          # bare amounts: 50.00, 16057.78
     (re.compile(r"\b\d{5}\b"), lambda m: mask_member_id(m.group())),  # member IDs (and zip codes)
 ]
 

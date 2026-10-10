@@ -9,6 +9,7 @@ import pytest
 from src.agent import MockLLM, load_mock, run_discovery
 from src.agent.llm import LLMError, make_llm
 from src.handoff import open_session
+from src.logs import read_log
 from src.models import RunStatus
 from src.models.settings import load_settings
 from src.models.values import ParseError, parse_value
@@ -32,9 +33,11 @@ def discover(bank_url, tmp_path):
     policy = load_policy().model_copy(update={"allowed_domains": [urlsplit(bank_url).netloc]})
 
     def _run(calls, goal=GOAL, **kw):
+        """calls: a list of scripted tool calls, or a ready-made (mock) LLM."""
+        llm = calls if hasattr(calls, "decide") else MockLLM(calls)
         with open_session("discover", settings=settings, policy=policy, runs_dir=tmp_path, echo=False,
                           username="demo", password="demo123", **kw) as s:
-            return run_discovery(s, MockLLM(calls), goal), s
+            return run_discovery(s, llm, goal), s
     return _run
 
 
@@ -127,8 +130,25 @@ def test_risky_click_rejected_stops_discovery(discover):
 
 def test_task_input_must_come_from_goal(discover):
     made_up = {**TASK, "args": {**TASK["args"], "inputs": [{**TASK["args"]["inputs"][0], "value": "54321"}]}}
-    result, _ = discover([made_up])
+    result, s = discover([made_up] * 3)
     assert result.outcome == "llm_error" and "not in the goal" in result.detail
+    assert [e.outcome for e in read_log(s.logger.folder.log_path)].count("task_rejected") == 2
+
+
+def test_rejected_task_is_retried_with_the_reason(discover):
+    """Seen with Groq: an input value sent as a number. The model is told why, and fixes it."""
+    bad = {**TASK, "args": {**TASK["args"], "inputs": [{"name": "member_id", "type": "string"}]}}  # no value
+
+    class Recording(MockLLM):
+        prompts: list[str] = []
+
+        def decide(self, system, prompt, tools):
+            Recording.prompts.append(prompt)
+            return super().decide(system, prompt, tools)
+
+    result, _ = discover(Recording([bad, TASK, TYPE_ID, SEARCH, EXTRACT, DONE]))
+    assert result.outcome == "success"
+    assert "was rejected" in Recording.prompts[1] and "value" in Recording.prompts[1]
 
 
 # ---------------------------------------------------------------- units

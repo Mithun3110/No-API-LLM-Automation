@@ -1,0 +1,26 @@
+- table:
+  - rowgroup:
+    - 'row "CoreServ Teller Member Services Console Teller: Demo Teller | Member Search | Log Off"':
+      - cell "CoreServ Teller Member Services Console"
+      - 'cell "Teller: Demo Teller | Member Search | Log Off"':
+        - text: "Teller: Demo Teller |"
+        - link "Member Search":
+          - /url: /search
+        - text: "|"
+        - link "Log Off":
+          - /url: /logout
+- table:
+  - rowgroup:
+    - 'row "System Error Error reference: SYS-500"':
+      - 'cell "System Error Error reference: SYS-500"':
+        - table:
+          - rowgroup:
+            - 'row "System Error Error reference: SYS-500"':
+              - 'cell "System Error Error reference: SYS-500"':
+                - heading "System Error" [level=2]
+                - alert: Something went wrong. The request could not be completed. Please try again later.
+                - text: "Error reference: SYS-500"
+- table:
+  - rowgroup:
+    - row "CoreServ Teller v4.2 © 1999-2026 Fictional Credit Union Systems. Authorized use only.":
+      - cell "CoreServ Teller v4.2 © 1999-2026 Fictional Credit Union Systems. Authorized use only."

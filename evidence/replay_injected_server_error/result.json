@@ -1,0 +1,29 @@
+{
+  "status": "FAILED",
+  "run_id": "20261010T023436Z-b8aa",
+  "mode": "replay",
+  "recipe_id": "member.lookup_savings_balance",
+  "recipe_version": "1.0.0",
+  "outputs": {},
+  "outcome_code": null,
+  "failure": {
+    "step": 3,
+    "expected": "no error page",
+    "observed": "\"Something went wrong.\" is shown",
+    "error_type": "server_error",
+    "evidence": [
+      "evidence/replay_injected_server_error/01_step3_failure.png",
+      "evidence/replay_injected_server_error/step3_failure_accessibility.yaml",
+      "evidence/replay_injected_server_error/trace.zip"
+    ]
+  },
+  "message": "hard failure: server_error",
+  "recoveries": [],
+  "llm_recovery_used": false,
+  "answered_by": "recipe",
+  "llm_used_for": [],
+  "human_interventions": [],
+  "approvals": [],
+  "warnings": [],
+  "log_file": "evidence/replay_injected_server_error/log.jsonl"
+}

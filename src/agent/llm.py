@@ -18,6 +18,9 @@ from src.models.settings import Settings
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 PROVIDERS = ("groq", "openai", "anthropic")
 MAX_API_ATTEMPTS = 3  # transient API errors (rate limit, timeout) are retried a few times
+# Per request. The SDK default is 600 s with 2 hidden retries: a hung request looked like a frozen
+# run for up to 30 minutes. Retries are done by _with_retries instead, where they are visible.
+REQUEST_TIMEOUT_S = 60
 
 
 class LLMError(Exception):
@@ -57,7 +60,7 @@ class OpenAICompatibleClient:
 
     def __init__(self, api_key: str, model: str, temperature: float, base_url: str | None = None):
         from openai import OpenAI  # imported here: only needed when this provider is chosen
-        self._client = OpenAI(api_key=api_key, base_url=base_url)
+        self._client = OpenAI(api_key=api_key, base_url=base_url, timeout=REQUEST_TIMEOUT_S, max_retries=0)
         self.model = model
         self.temperature = temperature
 
@@ -84,7 +87,7 @@ class OpenAICompatibleClient:
 class AnthropicClient:
     def __init__(self, api_key: str, model: str, temperature: float):
         from anthropic import Anthropic
-        self._client = Anthropic(api_key=api_key)
+        self._client = Anthropic(api_key=api_key, timeout=REQUEST_TIMEOUT_S, max_retries=0)
         self.model = model
         self.temperature = temperature
 

@@ -37,6 +37,7 @@ class ControlError(Exception):
 
 
 TARGETED_ACTIONS = ("click", "type", "select", "extract")
+LOGIN_ATTEMPTS = 2
 
 
 class Session:
@@ -191,13 +192,20 @@ class Session:
             Action("click", (RoleStrategy(by="role", role="button", name="Sign On"),), mode="session",
                    reason="sign on"),
         ]
-        for action in steps:
-            if not self.perform(action).ok:
-                raise SessionError(f"login failed at '{action.reason}'")
-        hit = self.browser.wait_for_any([WaitCondition(text="Member Search"),
+        # Login only types into fields, so it is safe to repeat: one retry absorbs the occasional
+        # browser hiccup (seen once: a visible Chrome window not accepting text in the password field).
+        for attempt in range(1, LOGIN_ATTEMPTS + 1):
+            failed = next((a for a in steps if not self.perform(a).ok), None)
+            if failed is None:
+                break
+            if attempt == LOGIN_ATTEMPTS:
+                raise SessionError(f"login failed at '{failed.reason}'")
+            self.logger.log("session", "retry", self._control, action="login",
+                            reason=f"login failed at '{failed.reason}', trying once more")
+        hit = self.browser.wait_for_any([WaitCondition(heading="Member Search"),
                                          WaitCondition(text="Invalid user ID or password.")],
                                         self.settings.wait_timeout_s)
-        if hit is None or hit.text != "Member Search":
+        if hit is None or hit.heading != "Member Search":
             self.logger.log("session", "failed", self._control, action="login", reason="sign-on was rejected")
             raise SessionError("login failed: the bank rejected the credentials")
         self.logger.log("session", "ok", self._control, action="login", reason="signed on")
@@ -240,12 +248,14 @@ def open_session(
     if action_delay_s is None:
         action_delay_s = 0 if headless else settings.action_delay_s
     browser = Browser(headless=headless, slow_mo_ms=slow_mo_ms)
-    browser.start_trace()
     session = Session(browser, SafetyGuard(policy), logger, settings, approver, action_delay_s)
     failed = False
     try:
         logger.log("session", "started", session.control, action="open", reason=f"{mode} run")
         session.login(username, password)
+        # Tracing starts AFTER login: a trace records every call's arguments, including the
+        # password if it were running during sign-on.
+        browser.start_trace()
         yield session
     except BaseException:
         failed = True

@@ -1,0 +1,23 @@
+{
+  "status": "SUCCESS",
+  "run_id": "20261010T015708Z-09d3",
+  "mode": "discover",
+  "recipe_id": "member.lookup_savings_balance",
+  "recipe_version": null,
+  "outputs": {
+    "savings_balance": "***"
+  },
+  "outcome_code": null,
+  "failure": null,
+  "message": "Retrieved savings balance for member ***45.",
+  "recoveries": [],
+  "llm_recovery_used": false,
+  "answered_by": "llm_discovery",
+  "llm_used_for": [
+    "driving the UI live (openai/gpt-oss-120b, 5 decisions)"
+  ],
+  "human_interventions": [],
+  "approvals": [],
+  "warnings": [],
+  "log_file": "evidence/discovery_run/log.jsonl"
+}

@@ -27,7 +27,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from src.catalog import RECIPES_DIR, Catalog, StoredRecipe, approve
-from src.handoff import TerminalOperator, open_session, reject_all
+from src.handoff import SessionError, TerminalOperator, open_session, reject_all
 from src.logs import RunFolder, RunLogger
 from src.logs.run_folder import DEFAULT_RUNS_DIR
 from src.models import ControlState, Policy, Recipe, RunResult, RunStatus
@@ -36,6 +36,9 @@ from src.replay import replay, validate_inputs
 from src.safety import Masker, load_policy
 
 DRAFT_REFUSED = "Recipe is draft; approve it first or pass --allow-draft"
+# --slow: extra delay on every low-level browser operation, on top of the normal pause before each
+# action (settings.action_delay_s). Together about 1.5-2 s per action.
+SLOW_MO_MS = 200
 
 
 @dataclass
@@ -253,7 +256,7 @@ def make_recoverer(args, ctx: Context, s, mode: str):
 def session(args, ctx: Context, mode: str, operator):
     approver = operator.approve if operator else reject_all
     return open_session(mode, settings=ctx.settings, policy=ctx.policy, runs_dir=ctx.runs_dir, approver=approver,
-                        headless=ctx.headless, slow_mo_ms=600 if getattr(args, "slow", False) else 0,
+                        headless=ctx.headless, slow_mo_ms=SLOW_MO_MS if getattr(args, "slow", False) else 0,
                         action_delay_s=0 if getattr(args, "fast", False) else None)
 
 
@@ -340,11 +343,13 @@ def inject_before_step(session, error: str, step: int) -> None:
 # ---------------------------------------------------------------- arguments
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="run.py", description="Computer-use automation for a legacy bank UI.")
+    parser.add_argument("--recipes-dir", type=Path, help="recipe folder (default: recipes/)")
+    parser.add_argument("--runs-dir", type=Path, help="run folder (default: runs/)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     def browser_flags(p, inject=False):
         p.add_argument("--mock", action="store_true", help="use the mock LLM (no API key needed)")
-        p.add_argument("--slow", action="store_true", help="slow the browser down even more")
+        p.add_argument("--slow", action="store_true", help="slow down a little more (about 1.5-2 s per action)")
         p.add_argument("--fast", action="store_true", help="no pause before each action")
         p.add_argument("--auto-close", action="store_true", help="close the browser as soon as the run ends")
         p.add_argument("--no-human", action="store_true",
@@ -387,7 +392,15 @@ def main(argv: list[str] | None = None, ctx: Context | None = None) -> int:
     load_dotenv()
     args = build_parser().parse_args(argv)
     ctx = ctx or Context(settings=load_settings(), policy=load_policy(), interactive=sys.stdin.isatty())
-    return args.func(args, ctx)
+    if args.recipes_dir:
+        ctx.recipes_dir = args.recipes_dir
+    if args.runs_dir:
+        ctx.runs_dir = args.runs_dir
+    try:
+        return args.func(args, ctx)
+    except SessionError as e:  # e.g. the bank is down or rejects the login: a clear message, no traceback
+        print(f"error: {e}")
+        return 1
 
 
 if __name__ == "__main__":

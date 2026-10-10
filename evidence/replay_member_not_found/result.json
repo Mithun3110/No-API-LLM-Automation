@@ -1,0 +1,19 @@
+{
+  "status": "BUSINESS_OUTCOME",
+  "run_id": "20261010T015714Z-059b",
+  "mode": "replay",
+  "recipe_id": "member.lookup_savings_balance",
+  "recipe_version": "1.0.0",
+  "outputs": {},
+  "outcome_code": "MEMBER_NOT_FOUND",
+  "failure": null,
+  "message": "No member has this ID.",
+  "recoveries": [],
+  "llm_recovery_used": false,
+  "answered_by": "recipe",
+  "llm_used_for": [],
+  "human_interventions": [],
+  "approvals": [],
+  "warnings": [],
+  "log_file": "evidence/replay_member_not_found/log.jsonl"
+}

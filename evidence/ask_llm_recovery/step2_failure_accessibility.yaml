@@ -1,0 +1,33 @@
+- table:
+  - rowgroup:
+    - 'row "CoreServ Teller Member Services Console Teller: Demo Teller | Member Search | Log Off"':
+      - cell "CoreServ Teller Member Services Console"
+      - 'cell "Teller: Demo Teller | Member Search | Log Off"':
+        - text: "Teller: Demo Teller |"
+        - link "Member Search":
+          - /url: /search
+        - text: "|"
+        - link "Log Off":
+          - /url: /logout
+- table:
+  - rowgroup:
+    - row "Member Search Member ID Search Enter a full 5-digit Member ID, or the first digits to list matches.":
+      - cell "Member Search Member ID Search Enter a full 5-digit Member ID, or the first digits to list matches.":
+        - table:
+          - rowgroup:
+            - row "Member Search Member ID Search Enter a full 5-digit Member ID, or the first digits to list matches.":
+              - cell "Member Search Member ID Search Enter a full 5-digit Member ID, or the first digits to list matches.":
+                - heading "Member Search" [level=2]
+                - table:
+                  - rowgroup:
+                    - row "Member ID Search":
+                      - cell "Member ID"
+                      - cell:
+                        - textbox "Member ID"
+                      - cell "Search":
+                        - button "Search"
+                - text: Enter a full 5-digit Member ID, or the first digits to list matches.
+- table:
+  - rowgroup:
+    - row "CoreServ Teller v4.2 © 1999-2026 Fictional Credit Union Systems. Authorized use only.":
+      - cell "CoreServ Teller v4.2 © 1999-2026 Fictional Credit Union Systems. Authorized use only."

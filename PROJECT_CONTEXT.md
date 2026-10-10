@@ -178,7 +178,7 @@ Not chosen: code generation, cross-tenant demo, multi-run stability.
    - Exit code 0 for SUCCESS or BUSINESS_OUTCOME (both valid answers), 1 otherwise.
    - Every run says how it was answered, before the browser opens and in the result: `answered_by` (recipe = deterministic replay with no LLM decisions on the website, or llm_discovery = the LLM drove the UI live) and `llm_used_for` (matching only, nothing at all for `--recipe`, or the number of live decisions).
    - With a person at the keyboard: risky steps ask yes/no, hard failures and stuck discovery hand over the browser; `--no-human` disables that. Without a terminal, every prompt is answered "no".
-   - Visible runs pause `settings.action_delay_s` (1.5 s) before each action so a person can follow (login is not paced); headless runs and `--fast` do not pause. `--slow` additionally slows every low-level browser operation.
+   - Visible runs pause `settings.action_delay_s` (1.5 s) before each action so a person can follow (login is not paced); headless runs and `--fast` do not pause. `--slow` additionally adds 200 ms to every low-level browser operation (about 1.5-2 s per action in total).
    - Demo/testing flags on `ask` and `replay`: `--inject <popup|slow_page|session_expired|server_error> --at-step N`. `--slow`, `--auto-close` on browser commands.
    - Imports of LLM code live inside the functions that need them; a test runs `replay --recipe` in a fresh interpreter and checks that no `src.agent`, `openai` or `anthropic` module was loaded.
    - `ask "<request>"`: main command.
@@ -731,6 +731,16 @@ pytest
 ---
 
 ## PART K: EVIDENCE TO PRODUCE
+
+Produced in step 13 (see `evidence/README.md` for the index): fresh bank and seed data on :5050, real Groq model (`openai/gpt-oss-120b`) for discovery, matching and recovery, a person at the terminal for the takeover and both approvals. Folders: `discovery_run`, `replay_success`, `replay_member_not_found`, `replay_injected_popup`, `replay_injected_server_error`, `ask_llm_recovery` (extra), `human_takeover`, `risky_action_approval/{approved,rejected}`, plus `example_recipe.json`. Paths inside the files were rewritten to point at `evidence/`; every file was scanned for local paths, the password and the members' real data before publishing.
+
+Fixes made because of the evidence runs (all with tests):
+- Goal values the model forgot to declare as inputs (seen: deposit and account type typed as fixed values, the amount logged unmasked): discovery now declares them automatically (sensitive, masked before logging, recipe `needs_review`), equal amounts (`$50.00` / `50.00`) count as one input, the prompt shows the exact input shape, the masker also masks bare amounts (`50.00`), and the recorder refuses any value from the goal stored as a fixed value.
+- Groq validates tool calls against the schema server-side (rejecting a missing or mistyped field before our code sees it): the schema sent to the model has no `required` lists, and a rejected `define_task` is retried up to 3 times WITH the rejection reason.
+- LLM requests had the SDK default timeout (600 s, 2 hidden retries): now 60 s, no hidden retries.
+- Playwright traces record call arguments, including the password typed at login: tracing now starts after login (tested). A trace that cannot be saved (e.g. Ctrl+C) is a warning, not a crash.
+- A login flake in the visible window (password field not accepting text once): login retries once; login errors print cleanly.
+- `--slow` lightened to 200 ms per low-level operation (about 1.5-2 s per action with the normal pause).
 
 ```
 evidence/

@@ -85,8 +85,8 @@ class _Builder:
             "description": self._clean(self.task.description),
             "version": next_version(recipe_id, recipes_dir),
             "status": "draft",  # never runs unreviewed in strict mode until approved
-            # Human steps could not be re-verified and were not chosen by the agent: review them.
-            "needs_review": any(s.source == "human" for s in agent_steps),
+            # Human steps (not re-verified) and inputs the system had to declare itself: review them.
+            "needs_review": any(s.source == "human" for s in agent_steps) or bool(self.result.auto_inputs),
             "app": {**self.rules["app"], "entry_url": self.settings.bank_base_url + self.settings.entry_path},
             "provenance": {"recorded_from_run": self.run_id, "recorded_at": datetime.now(timezone.utc).isoformat()},
             "inputs": {i.name: {"description": self.masker.mask_text(i.description) or i.name, "type": i.type,
@@ -151,6 +151,9 @@ class _Builder:
         bare = re.sub(r"\{\{\w+\}\}", "", text)
         if self.masker.mask_text(bare) != bare:
             raise RecorderError(f"step {step_number} would store a real value; declare it as an input instead")
+        if bare.strip() and bare.strip().lower() in self.result.goal.lower():
+            # A value copied from the goal is a parameter by definition, never a fixed value.
+            raise RecorderError(f"step {step_number} would store '{bare.strip()}' from the goal as a fixed value")
         return text
 
     def _generic_strategies(self, s: AgentStep) -> list[Strategy]:

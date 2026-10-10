@@ -22,8 +22,11 @@ TASK_PROMPT = """Goal: {goal}
 
 Before acting, define this task as a reusable capability with `define_task`:
 - recipe_id: namespaced and generic, e.g. member.lookup_savings_balance (no member numbers in it)
-- inputs: every value from the goal that would change next time (e.g. the member ID), with its
-  value for this run copied EXACTLY from the goal
+- inputs: EVERY value from the goal that would change next time: member IDs, account types,
+  amounts, phone numbers, addresses... Each input is an object with "name" (snake_case), "type"
+  (string, number or currency) and "value": this run's value copied EXACTLY from the goal,
+  e.g. {{"name": "member_id", "type": "string", "value": "12345"}}.
+  A value you type later that is not declared here would be stored as a fixed value.
 - outputs: the values the goal asks you to read and return"""
 
 STEP_PROMPT = """Goal: {goal}

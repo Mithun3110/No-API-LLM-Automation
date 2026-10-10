@@ -1,0 +1,28 @@
+{
+  "status": "SUCCESS",
+  "run_id": "20261010T023439Z-a44a",
+  "mode": "replay",
+  "recipe_id": "member.lookup_savings_balance",
+  "recipe_version": "1.0.0",
+  "outputs": {
+    "savings_balance": "***"
+  },
+  "outcome_code": null,
+  "failure": null,
+  "message": "all steps done and success check passed",
+  "recoveries": [
+    "step 2: LLM recovery succeeded (1 action(s))"
+  ],
+  "llm_recovery_used": true,
+  "answered_by": "recipe",
+  "llm_used_for": [
+    "matching the request to this recipe (matched by openai/gpt-oss-120b)",
+    "recovering step 2 (1 action(s), succeeded)"
+  ],
+  "human_interventions": [],
+  "approvals": [],
+  "warnings": [
+    "step 2 needed LLM recovery: the recipe needs review"
+  ],
+  "log_file": "evidence/ask_llm_recovery/log.jsonl"
+}

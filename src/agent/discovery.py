@@ -12,6 +12,7 @@ but never become part of a recipe.
 """
 
 import hashlib
+import re
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -27,9 +28,10 @@ from src.models.values import ParseError, parse_value
 
 from . import prompts
 from .llm import LLMClient, LLMError
-from .tools import ACTION_TOOLS, TASK_TOOLS, AskHuman, DefineTask, Done, Extract, tool_specs, to_action
+from .tools import ACTION_TOOLS, TASK_TOOLS, AskHuman, DefineTask, Done, Extract, InputDef, tool_specs, to_action
 
 HISTORY_SHOWN = 12  # most recent actions included in each prompt
+TASK_ATTEMPTS = 3   # define_task attempts, each told why the previous one was rejected
 HUMAN_TOOLS = {"click": "click", "type": "type_text", "select": "select_option"}  # recorder kind -> tool
 
 Outcome = Literal["success", "not_achievable", "rejected", "stuck", "aborted", "llm_error"]
@@ -82,6 +84,7 @@ class DiscoveryResult:
     stop_reason: StopReason | None = None
     detail: str = ""
     run_result: RunResult | None = None
+    auto_inputs: list[str] = field(default_factory=list)  # declared by discovery, not the model
 
     @property
     def successful_steps(self) -> list[AgentStep]:
@@ -100,6 +103,7 @@ class Discovery:
         self.steps: list[AgentStep] = []
         self.outputs: dict[str, str | Decimal] = {}
         self._failures: dict[str, int] = {}  # action signature -> times it failed
+        self.auto_inputs: list[str] = []      # inputs the model forgot and discovery declared
 
     # ------------------------------------------------------------ main loop
     def run(self) -> DiscoveryResult:
@@ -170,14 +174,31 @@ class Discovery:
                                 value=a.value, source="human"))
 
     def _define_task(self) -> DefineTask:
-        call = self.llm.decide(prompts.SYSTEM, prompts.TASK_PROMPT.format(goal=self.goal), tool_specs(TASK_TOOLS))
+        """Ask for the task definition. A rejected definition is sent back WITH the reason, so the
+        model can correct it: resending the same prompt tends to repeat the same mistake."""
+        prompt = prompts.TASK_PROMPT.format(goal=self.goal)
+        for attempt in range(1, TASK_ATTEMPTS + 1):
+            try:
+                return self._validated_task(self.llm.decide(prompts.SYSTEM, prompt, tool_specs(TASK_TOOLS)))
+            except (LLMError, ValidationError, ValueError) as e:
+                if attempt == TASK_ATTEMPTS:
+                    raise ValueError(str(e)[:300]) from e
+                self.session.logger.log("discover", "task_rejected", self.session.control, action="define_task",
+                                        reason=str(e)[:300], data={"attempt": attempt})
+                prompt = (prompts.TASK_PROMPT.format(goal=self.goal)
+                          + f"\n\nYour previous define_task call was rejected: {str(e)[:300]}\nFix it and call "
+                            "define_task again. Every input needs name, type and value.")
+        raise AssertionError("unreachable")
+
+    def _validated_task(self, call) -> DefineTask:
         if call.name != "define_task":
             raise ValueError(f"expected define_task, got {call.name}")
         task = DefineTask.model_validate(call.arguments)
         # Inputs must come from the goal. A value the LLM made up would become a wrong default.
         for i in task.inputs:
             if i.value.lower() not in self.goal.lower():
-                raise ValueError(f"input '{i.name}' value is not in the goal")
+                raise ValueError(f"input '{i.name}' value '{i.value}' is not in the goal")
+        for i in task.inputs:
             if i.sensitive:
                 self.session.logger.masker.add_value(i.value, field=i.name)
         self.session.logger.log(
@@ -206,6 +227,8 @@ class Discovery:
                                         f"'{args.output}' is not a declared output")
 
         action = to_action(args, step=number)
+        if action.value is not None:
+            self._declare_if_from_goal(action.value, field_name=getattr(args, "name", "value"))
         browser = self.session.browser
         before = self._fingerprint()
         heading_before = browser.heading()
@@ -266,6 +289,30 @@ class Discovery:
         return None
 
     # ------------------------------------------------------------ helpers
+    def _declare_if_from_goal(self, value: str, field_name: str) -> None:
+        """A typed/selected value that comes from the goal is a parameter, even if the model
+        forgot to declare it. Declare it (sensitive, so it is masked from now on) before the
+        action is logged, and remember it so the recipe is marked for review."""
+        if value in {i.value for i in self.task.inputs} or value.lower() not in self.goal.lower():
+            return
+        for i in self.task.inputs:
+            if _same_amount(i.value, value):
+                # Declared as "$50.00", typed as "50.00": the same input. Keep what was typed, so the
+                # recorder can turn it into {{placeholder}}.
+                i.value = value
+                self.session.logger.masker.add_value(value, field=i.name)
+                return
+        name = re.sub(r"[^a-z0-9]+", "_", field_name.lower()).strip("_") or "value"
+        while name in {i.name for i in self.task.inputs}:
+            name += "_2"
+        kind = "currency" if re.fullmatch(r"\$?\d[\d,]*\.\d{2}", value) else "string"
+        self.task.inputs.append(InputDef(name=name, description=f"{field_name} (declared automatically: "
+                                         "the value came from the goal)", type=kind, value=value, sensitive=True))
+        self.session.logger.masker.add_value(value, field=name)
+        self.auto_inputs.append(name)
+        self.session.logger.log("discover", "input_auto_declared", self.session.control, action="define_task",
+                                reason=f"'{name}' came from the goal but was not declared", data={"input": name})
+
     def _capture_locators(self, action: Action) -> tuple[list[Strategy], str | None]:
         """Read-only look at the target before acting: backup locators and dialog membership."""
         if not action.strategies:
@@ -310,7 +357,8 @@ class Discovery:
 
     def _finish(self, outcome: Outcome, stop_reason: StopReason | None = None, detail: str = "") -> DiscoveryResult:
         s, log = self.session, self.session.logger
-        result = DiscoveryResult(outcome, self.goal, self.task, self.steps, self.outputs, stop_reason, detail)
+        result = DiscoveryResult(outcome, self.goal, self.task, self.steps, self.outputs, stop_reason, detail,
+                                 auto_inputs=list(self.auto_inputs))
         evidence = []
         if outcome != "success":
             evidence.append(str(s.browser.screenshot(log.folder.screenshot_path(outcome))))
@@ -364,6 +412,12 @@ def human_locators(a: HumanAction) -> list[Strategy]:
     elif a.field and a.tag in ("input", "select", "textarea"):
         out.append(CssStrategy(by="css", value=f'{a.tag}[name="{a.field}"]'))
     return out
+
+
+def _same_amount(a: str, b: str) -> bool:
+    """'$1,250.00' and '1250.00' are the same amount."""
+    norm = [re.sub(r"[$,\s]", "", x) for x in (a, b)]
+    return all(re.fullmatch(r"-?\d+(\.\d+)?", n) for n in norm) and float(norm[0]) == float(norm[1])
 
 
 def _short(error: ValidationError) -> str:
