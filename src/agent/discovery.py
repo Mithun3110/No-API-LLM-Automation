@@ -4,11 +4,11 @@
 
 Stops on: done (goal met or not achievable), operator rejected a risky action, stuck
 (same action failed twice, a click changed nothing, the LLM asked for a human, step limit,
-timeout), or an LLM error. Being stuck leads to human takeover in step 9; for now it stops
-with a clear reason and evidence.
+timeout), or an LLM error. When stuck and an operator is available, a human takes over the
+same session; otherwise the run stops with the reason and evidence.
 
-Successful steps are kept in order for the recorder (step 7). Failed attempts are logged
-but never become part of a recipe.
+Successful steps are kept in order for the recorder. Failed attempts are logged but never
+become part of a recipe.
 """
 
 import hashlib
@@ -28,7 +28,9 @@ from src.models.values import ParseError, parse_value
 
 from . import prompts
 from .llm import LLMClient, LLMError
-from .tools import ACTION_TOOLS, TASK_TOOLS, AskHuman, DefineTask, Done, Extract, InputDef, tool_specs, to_action
+from .tools import (
+    ACTION_TOOLS, TASK_TOOLS, AskHuman, DefineTask, Done, Extract, InputDef, OutputDef, tool_specs, to_action,
+)
 
 HISTORY_SHOWN = 12  # most recent actions included in each prompt
 TASK_ATTEMPTS = 3   # define_task attempts, each told why the previous one was rejected
@@ -169,7 +171,7 @@ class Discovery:
             args["reason"] = "done by the human operator"
             heading_after = actions[i + 1].heading if i + 1 < len(actions) else result.heading_after
             number = (self.steps[-1].number if self.steps else 0) + 1
-            self._add(AgentStep(number, tool, args, "done", url_after="", heading_before=a.heading,
+            self._add(AgentStep(number, tool, args, "done", heading_before=a.heading,
                                 heading_after=heading_after, locators=human_locators(a), in_dialog=a.dialog,
                                 value=a.value, source="human"))
 
@@ -177,27 +179,26 @@ class Discovery:
         """Ask for the task definition. A rejected definition is sent back WITH the reason, so the
         model can correct it: resending the same prompt tends to repeat the same mistake."""
         prompt = prompts.TASK_PROMPT.format(goal=self.goal)
-        for attempt in range(1, TASK_ATTEMPTS + 1):
+        for attempt in range(1, TASK_ATTEMPTS):
             try:
                 return self._validated_task(self.llm.decide(prompts.SYSTEM, prompt, tool_specs(TASK_TOOLS)))
-            except (LLMError, ValidationError, ValueError) as e:
-                if attempt == TASK_ATTEMPTS:
-                    raise ValueError(str(e)[:300]) from e
+            except (LLMError, ValueError) as e:  # pydantic's ValidationError is a ValueError
                 self.session.logger.log("discover", "task_rejected", self.session.control, action="define_task",
                                         reason=str(e)[:300], data={"attempt": attempt})
                 prompt = (prompts.TASK_PROMPT.format(goal=self.goal)
                           + f"\n\nYour previous define_task call was rejected: {str(e)[:300]}\nFix it and call "
                             "define_task again. Every input needs name, type and value.")
-        raise AssertionError("unreachable")
+        # Last attempt: an error now goes to run(), which ends the run as llm_error.
+        return self._validated_task(self.llm.decide(prompts.SYSTEM, prompt, tool_specs(TASK_TOOLS)))
 
     def _validated_task(self, call) -> DefineTask:
         if call.name != "define_task":
             raise ValueError(f"expected define_task, got {call.name}")
         task = DefineTask.model_validate(call.arguments)
         # Inputs must come from the goal. A value the LLM made up would become a wrong default.
-        for i in task.inputs:
-            if i.value.lower() not in self.goal.lower():
-                raise ValueError(f"input '{i.name}' value '{i.value}' is not in the goal")
+        missing = [i for i in task.inputs if i.value.lower() not in self.goal.lower()]
+        if missing:
+            raise ValueError(f"input '{missing[0].name}' value '{missing[0].value}' is not in the goal")
         for i in task.inputs:
             if i.sensitive:
                 self.session.logger.masker.add_value(i.value, field=i.name)
@@ -208,7 +209,7 @@ class Discovery:
         return task
 
     # ------------------------------------------------------------ one turn
-    def _handle(self, number: int, tool: str, arguments: dict) -> "Stop | None":
+    def _handle(self, number: int, tool: str, arguments: dict) -> Stop | None:
         model = ACTION_TOOLS.get(tool)
         if model is None:
             return self._record_failure(number, tool, arguments, "invalid", f"unknown tool '{tool}'")
@@ -266,7 +267,7 @@ class Discovery:
         self._add(step)
         return None
 
-    def _handle_done(self, number: int, tool: str, arguments: dict, args: Done) -> "Stop | None":
+    def _handle_done(self, number: int, tool: str, arguments: dict, args: Done) -> Stop | None:
         if not args.success:
             self._add(AgentStep(number, tool, arguments, "done", args.summary))
             return Stop("not_achievable", detail=args.summary)
@@ -277,7 +278,8 @@ class Discovery:
         self._add(AgentStep(number, tool, arguments, "done", args.summary))
         return Stop("success", detail=args.summary)
 
-    def _record_failure(self, number, tool, arguments, status, message, step: AgentStep | None = None):
+    def _record_failure(self, number: int, tool: str, arguments: dict, status: str, message: str,
+                        step: AgentStep | None = None) -> Stop | None:
         """Log a failed attempt; the same action failing twice means the agent is stuck."""
         step = step or AgentStep(number, tool, arguments, status, message)
         step.status, step.message = status, message
@@ -349,7 +351,7 @@ class Discovery:
     def _output_names(self) -> list[str]:
         return [o.name for o in self.task.outputs]
 
-    def _output(self, name: str):
+    def _output(self, name: str) -> OutputDef:
         return next(o for o in self.task.outputs if o.name == name)
 
     def _missing_outputs(self) -> list[str]:

@@ -1,9 +1,9 @@
 # CLAUDE.md
 
-Read PROJECT_CONTEXT.md before doing anything. It is the single source of truth for this project: the assignment, every design decision, the architecture, file formats, build order, and deliverables.
+Read docs/PROJECT_CONTEXT.md (local, git-ignored) before doing anything. It is the single source of truth for this project: the assignment, every design decision, the architecture, file formats, build order, and deliverables.
 
 ## Rules
-- Follow PROJECT_CONTEXT.md. Ask before changing any design decision.
+- Follow docs/PROJECT_CONTEXT.md. Ask before changing any design decision.
 - Build one step from Part J at a time. After each step, explain what you built and why, tell me how to run and test it, and wait for me.
 - Python, Flask (bank_app on port 5050), Playwright (Chromium), Pydantic, pytest.
 - Only src/browser/ imports Playwright.

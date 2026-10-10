@@ -60,7 +60,7 @@ def browser():
 
 @pytest.fixture
 def logged_in(browser, bank_url):
-    """A browser signed in as the teller. (Real login logic arrives in step 5.)"""
+    """A bare browser signed in as the teller, for browser-layer tests that run without a Session."""
     browser.goto(bank_url + "/login")
     browser.page.fill("#f1", "demo")
     browser.page.fill("#f2", "demo123")

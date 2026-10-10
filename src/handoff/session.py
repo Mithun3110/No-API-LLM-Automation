@@ -3,7 +3,7 @@
 Session.perform() is the ONLY way any mode acts on the page. In order, it:
 1. refuses unless automation holds control,
 2. finds the element (strategies in order, exactly one match),
-3. asks the safety guard (block / needs approval / allow),
+3. asks the safety guard (block / needs approval / allow), and the human if approval is needed,
 4. performs the action through the browser layer,
 5. logs what happened, masked.
 """
@@ -16,7 +16,7 @@ from urllib.parse import urljoin, urlsplit
 
 from dotenv import load_dotenv
 
-from src.browser import Browser, BrowserError, ElementBlocked
+from src.browser import Browser, BrowserError, Element, ElementBlocked
 from src.logs import RunFolder, RunLogger
 from src.logs.run_folder import DEFAULT_RUNS_DIR
 from src.models import ControlState, Policy
@@ -49,10 +49,10 @@ class Session:
         self.settings = settings
         self.approver = approver
         self._control = ControlState.AUTOMATION
-        self.action_delay_s = action_delay_s  # pause before each action so a person can follow along
-        self.keep_trace = False  # set True to keep the trace even when the run did not raise
-        self.approvals: list[str] = []  # every approval decision this run, masked, for the result
-        self.takeovers = 0                       # human takeovers so far (bounded by settings.max_takeovers)
+        self.action_delay_s = action_delay_s      # pause before each action so a person can follow along
+        self.keep_trace = False                   # keep the trace even when the run did not raise
+        self.approvals: list[str] = []            # every approval decision this run, masked, for the result
+        self.takeovers = 0                        # human takeovers so far (bounded by settings.max_takeovers)
         self.human_interventions: list[str] = []  # what the human did each time, masked, for the result
 
     # ------------------------------------------------------------ control
@@ -110,7 +110,7 @@ class Session:
             target_role=role, target_name=name, step_risk=action.step_risk,
         )
 
-    def _execute(self, action: Action, element) -> ActionOutcome:
+    def _execute(self, action: Action, element: Element | None) -> ActionOutcome:
         b = self.browser
         try:
             match action.kind:
@@ -225,7 +225,7 @@ def open_session(
     slow_mo_ms: int = 0,
     action_delay_s: float | None = None,
 ) -> Iterator[Session]:
-    """Open browser, start tracing, sign in, and hand over a ready session. Cleans up on exit.
+    """Open the browser, sign in, start tracing, and hand over a ready session. Cleans up on exit.
 
     slow_mo_ms delays every low-level browser operation (demos). action_delay_s pauses before each
     action; by default settings.action_delay_s when the window is visible, 0 when headless.

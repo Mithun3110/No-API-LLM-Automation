@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
@@ -69,6 +70,14 @@ class Catalog:
 
     def all_active(self) -> list[StoredRecipe]:
         return [self.active(i) for i in self.ids()]
+
+    def for_app(self, app_origin: str) -> "Catalog":
+        """Only the recipes recorded for this app (scheme://host:port of their entry URL)."""
+        def same_app(s: StoredRecipe) -> bool:
+            parts = urlsplit(s.recipe.app.entry_url)
+            return f"{parts.scheme}://{parts.netloc}" == app_origin
+        kept = {rid: [s for s in versions if same_app(s)] for rid, versions in self.versions.items()}
+        return Catalog({rid: v for rid, v in kept.items() if v}, list(self.problems))
 
     def latest(self, recipe_id: str) -> StoredRecipe | None:
         stored = self.versions.get(recipe_id, [])

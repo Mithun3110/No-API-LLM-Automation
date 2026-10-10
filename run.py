@@ -21,8 +21,9 @@ never loads an LLM client.
 import argparse
 import sys
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -33,7 +34,7 @@ from src.logs.run_folder import DEFAULT_RUNS_DIR
 from src.models import ControlState, Policy, Recipe, RunResult, RunStatus
 from src.models.settings import Settings, load_settings
 from src.replay import replay, validate_inputs
-from src.safety import Masker, load_policy
+from src.safety import Masker, SafetyGuard, load_policy
 
 DRAFT_REFUSED = "Recipe is draft; approve it first or pass --allow-draft"
 # --slow: extra delay on every low-level browser operation, on top of the normal pause before each
@@ -120,6 +121,9 @@ def cmd_approve(args, ctx: Context) -> int:
 
 # ---------------------------------------------------------------- discover
 def cmd_discover(args, ctx: Context) -> int:
+    ctx = with_target(args, ctx)
+    if ctx is None:
+        return 1
     return exit_code(run_discovery_command(args, ctx, args.goal, mode="discover"))
 
 
@@ -176,7 +180,15 @@ def cmd_replay(args, ctx: Context) -> int:
 
 # ---------------------------------------------------------------- ask (main)
 def cmd_ask(args, ctx: Context) -> int:
+    target_given = getattr(args, "target", None) is not None
+    ctx = with_target(args, ctx)
+    if ctx is None:
+        return 1
     catalog = Catalog.load(ctx.recipes_dir)
+    if target_given:
+        # Only recipes recorded for THIS app: a recipe from another app (another bank's instance)
+        # is never used just because the request matches it.
+        catalog = catalog.for_app(origin(ctx.settings.bank_base_url))
     match = match_request(args, ctx, catalog, args.request) if catalog.ids() else None
     if match is not None and match.missing_value:
         # A recipe exists but the request lacks a value: ask the caller, do not discover a duplicate.
@@ -212,6 +224,30 @@ def offer_approval(ctx: Context, stored: StoredRecipe, result: RunResult) -> Non
 
 
 # ---------------------------------------------------------------- shared
+def with_target(args, ctx: Context) -> Context | None:
+    """--target <url>: the app and start page for THIS run. Checked against the allowlist first, so a
+    command-line option can never widen what the agent may touch (only config/policy.json can).
+    Without --target, config/settings.json decides, as before."""
+    target = getattr(args, "target", None)
+    if not target:
+        return ctx
+    problem = SafetyGuard(ctx.policy).url_problem(target)
+    if problem:
+        print(f"error: --target {target} is outside the allowlist ({problem}); see config/policy.json")
+        return None
+    parts = urlsplit(target)
+    settings = ctx.settings.model_copy(update={"bank_base_url": f"{parts.scheme}://{parts.netloc}",
+                                               "entry_path": parts.path or "/"})
+    print(f"Target: {settings.bank_base_url}, starting at {settings.entry_path}")
+    return replace(ctx, settings=settings)
+
+
+def origin(url: str) -> str:
+    """http://localhost:5050/search -> http://localhost:5050 (scheme, host and port identify the app)."""
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}"
+
+
 def match_request(args, ctx: Context, catalog: Catalog, request: str):
     from src.catalog.matcher import match_with_llm, match_with_mock  # LLM code: only on this path
     if args.mock:
@@ -225,6 +261,8 @@ def run_replay(args, ctx: Context, stored: StoredRecipe, inputs: dict, how: str,
     _, errors = validate_inputs(recipe, inputs)
     if errors:  # checked before a browser is opened
         return finish_offline(ctx, mode, RunStatus.INVALID_INPUT, "; ".join(errors), recipe)
+    # A recipe knows its app: replay runs against the app it was recorded on, never another one.
+    ctx = replace(ctx, settings=ctx.settings.model_copy(update={"bank_base_url": origin(recipe.app.entry_url)}))
     llm_used_for = [] if how == "chosen with --recipe" else [f"matching the request to this recipe ({how})"]
     print(f"\n>>> Using recipe {recipe.recipe_id} v{recipe.version} ({recipe.status}): deterministic replay, "
           "the LLM makes no decisions on the website.")
@@ -368,8 +406,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--yes", action="store_true", help="approve without the confirmation prompt")
     p.set_defaults(func=cmd_approve)
 
+    target_help = "the app and start page, e.g. http://localhost:5050/search (default: config/settings.json)"
     p = sub.add_parser("discover", help="run the discovery agent on a goal")
     p.add_argument("goal")
+    p.add_argument("--target", metavar="URL", help=target_help)
     browser_flags(p)
     p.set_defaults(func=cmd_discover)
 
@@ -383,6 +423,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("ask", help="main: use a recipe if one fits, otherwise discover one")
     p.add_argument("request")
+    p.add_argument("--target", metavar="URL",
+                   help=target_help + "; only recipes recorded for this app are considered")
     browser_flags(p, inject=True)
     p.set_defaults(func=cmd_ask)
     return parser

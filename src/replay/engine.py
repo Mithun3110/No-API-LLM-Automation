@@ -78,24 +78,24 @@ class Replayer:
     def __init__(self, recipe: Recipe, session: Session, inputs: dict[str, str], llm_used_for: list[str] | None = None,
                  recoverer: Recoverer | None = None):
         self.recipe = recipe
-        self.recoverer = recoverer
-        self._recovery_tried: set[int] = set()  # once per step: a second attempt is a human's job
-        self.llm_recovery_used = False
-        self.llm_used_for = list(llm_used_for or [])  # decided by the caller (e.g. matching); replay adds none
         self.session = session
         self.browser = session.browser
         self.log = session.logger
         self.inputs = inputs
         self.timeout = session.settings.wait_timeout_s
+        self.recoverer = recoverer
         self.outputs: dict[str, str | Decimal] = {}
         self.recoveries: list[str] = []
         self.warnings: list[str] = []
+        self.llm_used_for = list(llm_used_for or [])  # set by the caller (e.g. matching); recovery may add to it
+        self.llm_recovery_used = False
+        self._recovery_tried: set[int] = set()            # once per step: a second attempt is a human's job
         self._attempts: dict[tuple[int, str], int] = {}  # (step, handler id) -> fixes applied
         self._evidence: list[str] = []                    # from the latest hard failure
 
     # ------------------------------------------------------------ run
-    def run(self, operator: Operator | None = None, start_at: int = 1) -> ReplayResult:
-        stop = self._execute(start_at)
+    def run(self, operator: Operator | None = None) -> ReplayResult:
+        stop = self._execute(1)
         while stop.status == RunStatus.FAILED:
             # 1. One bounded LLM attempt at the failed step (ask only), then carry on deterministically.
             if self._try_recovery(stop):
@@ -324,7 +324,7 @@ class Replayer:
                     active.append(h)
         return active
 
-    def _triggered(self, h) -> bool:
+    def _triggered(self, h: BusinessOutcomeHandler | HardFailureHandler | RecoverableHandler) -> bool:
         if h.when.text is not None:
             return self.browser.text_visible(h.when.text)
         if h.when.dialog is not None:
@@ -433,8 +433,9 @@ def replay(recipe: Recipe, raw_inputs: dict[str, str], session: Session,
            recoverer: Recoverer | None = None) -> ReplayResult:
     """Validate inputs, then run the recipe on the live session. INVALID_INPUT never touches the page.
 
-    With an operator, hard failures go to human takeover on the same session (strict replay);
-    without one, they are returned as FAILED (e.g. to try bounded LLM recovery first, step 11).
+    recoverer (only `ask` passes one): an unexpected step failure first gets one bounded LLM attempt.
+    operator: a hard failure is then handed to a human on the same session; without one, it is
+    returned as FAILED.
     """
     values, errors = validate_inputs(recipe, raw_inputs)
     if errors:

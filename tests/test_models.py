@@ -1,6 +1,5 @@
 """The recipe schema is the core contract, so every validation rule has a test."""
 
-import copy
 import json
 from pathlib import Path
 

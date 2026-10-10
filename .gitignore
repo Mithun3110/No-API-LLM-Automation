@@ -18,3 +18,6 @@ docs/
 
 # Generated fake-bank database (rebuilt from bank_app/data/members.json)
 bank_app/data/bank.db
+
+# Planning notes, kept locally in docs/ (never published)
+PROJECT_CONTEXT.md

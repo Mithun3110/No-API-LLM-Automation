@@ -231,3 +231,54 @@ def test_only_ask_gets_llm_recovery(ctx):
     args = SimpleNamespace(mock=True)
     assert run.make_recoverer(args, ctx, None, "replay") is None          # strict: straight to a human
     assert isinstance(run.make_recoverer(args, ctx, None, "ask"), GiveUpRecoverer)
+
+
+# ---------------------------------------------------------------- --target
+def test_discover_without_target_uses_settings(ctx):
+    assert cli(ctx, "discover", LOOKUP_GOAL, "--mock") == 0
+    recipe = Catalog.load(ctx.recipes_dir).active(RECIPE_ID).recipe
+    assert recipe.app.entry_url == ctx.settings.bank_base_url + ctx.settings.entry_path
+
+
+def test_target_is_used_for_login_and_first_step_and_recorded(ctx, bank_url):
+    target = bank_url + "/"  # start on a different entry page than the settings' /search
+    assert cli(ctx, "discover", LOOKUP_GOAL, "--mock", "--target", target) == 0
+    recipe = Catalog.load(ctx.recipes_dir).active(RECIPE_ID).recipe
+    assert recipe.app.entry_url == target                      # where it was recorded
+    assert recipe.steps[0].action == "navigate" and recipe.steps[0].url == "/"  # its start page
+    folder = Path(last_result(ctx)["log_file"]).parent
+    log = [json.loads(line) for line in (folder / "log.jsonl").read_text().splitlines()]
+    navigations = [e["target"] for e in log if e["action"] == "navigate"]
+    assert navigations[:2] == ["/login", "/"]  # login on the target's app, then its start page
+
+
+@pytest.mark.parametrize("target, reason", [
+    ("https://some-other-site.com/search", "domain"),  # domain outside the allowlist
+    ("{bank}/_admin/inject", "path"),                  # the bank's own host, but a forbidden path
+])
+def test_target_outside_the_allowlist_is_refused(ctx, capsys, bank_url, target, reason):
+    assert cli(ctx, "discover", LOOKUP_GOAL, "--mock", "--target", target.format(bank=bank_url)) == 1
+    out = capsys.readouterr().out
+    assert "outside the allowlist" in out and reason in out
+    assert not ctx.runs_dir.exists() or not list(ctx.runs_dir.iterdir())  # nothing was started
+
+
+def test_replay_has_no_target_option(ctx):
+    with pytest.raises(SystemExit):
+        cli(ctx, "replay", "--recipe", RECIPE_ID, "--input", "member_id=12345", "--target", "http://x/")
+
+
+def test_ask_with_target_only_uses_recipes_of_that_app(discovered, bank_url, capsys):
+    cli(discovered, "approve", RECIPE_ID, "--yes")
+    # same app (the recipe was recorded on it): the recipe is replayed
+    assert cli(discovered, "ask", "What's the savings balance for member 23456?", "--mock",
+               "--target", bank_url + "/search") == 0
+    assert last_result(discovered)["answered_by"] == "recipe"
+    # another app (same bank server under a different host name, standing in for another
+    # institution's instance): that recipe is NOT used; discovery runs for this app instead
+    other = bank_url.replace("127.0.0.1", "localhost")
+    discovered.policy = discovered.policy.model_copy(update={
+        "allowed_domains": discovered.policy.allowed_domains + [urlsplit(other).netloc]})
+    assert cli(discovered, "ask", "What's the savings balance for member 23456?", "--mock",
+               "--target", other + "/search") == 0
+    assert last_result(discovered)["answered_by"] == "llm_discovery"

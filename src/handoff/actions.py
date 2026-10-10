@@ -66,7 +66,7 @@ class ApprovalRequest:
     page_summary: str                          # what is about to be confirmed, masked
 
 
-# Called for risky actions. Returns True to approve. The terminal version arrives in step 9.
+# Called for risky actions; returns True to approve. TerminalOperator.approve asks a person (operator.py).
 Approver = Callable[[ApprovalRequest], bool]
 
 
