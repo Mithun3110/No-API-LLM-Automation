@@ -29,6 +29,29 @@ cp .env.example .env
 Other settings (step limit, wait timeout, retries, pause per action) are in `config/settings.json`.
 The allowlist and masking rules are in `config/policy.json`.
 
+## LLM API key (Groq recommended)
+
+Real LLM runs (`discover`, `ask`, and `replay "<request>"` without `--mock`) need an API key. Groq is the
+recommended and tested provider: the evidence was produced with `openai/gpt-oss-120b` on Groq. Without a key,
+everything still runs with `--mock`.
+
+1. Sign in at [console.groq.com](https://console.groq.com) and open **API Keys**
+   ([console.groq.com/keys](https://console.groq.com/keys)).
+2. Create a key and copy it straight away (you may not be able to see it again).
+3. Put it in `.env` (created by `cp .env.example .env` above):
+   ```
+   LLM_PROVIDER=groq
+   LLM_API_KEY=<your Groq key>
+   ```
+4. Check it with a real discovery run (the bank must be running, see Demo path):
+   ```bash
+   python run.py discover "Look up member 12345 and read their savings balance"
+   ```
+   The banner should say `the LLM (openai/gpt-oss-120b) drives the website live`.
+
+`.env` is git-ignored, so the key is never committed. Anthropic or OpenAI keys also work (`LLM_PROVIDER=anthropic`
+or `openai`), but those two clients have not been tested.
+
 ## Run without an API key
 
 Add `--mock` to `ask`, `replay` (with a request) or `discover`. The LLM is replaced by scripted decisions from
