@@ -171,3 +171,27 @@ def test_unknown_provider(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "carrier-pigeon")
     with pytest.raises(LLMError, match="unknown LLM_PROVIDER"):
         make_llm(load_settings())
+
+
+def test_rate_limit_waits_as_long_as_the_provider_says(monkeypatch):
+    """Seen with Groq: 8,000 tokens per minute. A 2 s backoff retried while the limit still applied."""
+    import src.agent.llm as llm
+
+    class Response:
+        headers = {"retry-after": "37"}
+
+    class RateLimitError(Exception):
+        response = Response()
+
+    waits, calls = [], {"n": 0}
+    monkeypatch.setattr(llm.time, "sleep", waits.append)
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RateLimitError("429")
+        return "ok"
+    assert llm._with_retries(flaky) == "ok" and waits == [37.0]
+    assert llm._backoff_s(RateLimitError(), 1) == 37.0
+    Response.headers = {"retry-after": "900"}
+    assert llm._backoff_s(RateLimitError(), 1) == llm.MAX_RATE_LIMIT_WAIT_S  # capped

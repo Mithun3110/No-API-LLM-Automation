@@ -43,93 +43,115 @@ everything still runs with `--mock`.
    LLM_PROVIDER=groq
    LLM_API_KEY=<your Groq key>
    ```
-4. Check it with a real discovery run (the bank must be running, see Demo path):
+4. Check it with a real discovery run (the bank must be running, see How to run):
    ```bash
    python run.py discover "Look up member 12345 and read their savings balance"
    ```
    The banner should say `the LLM (openai/gpt-oss-120b) drives the website live`.
 
+Groq limits tokens per minute (8,000 on the key used here). If a run hits the limit, it prints
+`[llm] rate limit reached, waiting N s` and continues once the limit resets.
+
 `.env` is git-ignored, so the key is never committed. Anthropic or OpenAI keys also work (`LLM_PROVIDER=anthropic`
 or `openai`), but those two clients have not been tested.
 
-## Run without an API key
+## How to run
 
-Add `--mock` to `ask`, `replay` (with a request) or `discover`. The LLM is replaced by scripted decisions from
-`config/mock_scripts/` (savings balance lookup, open a sub-account, update a phone number), behind the same
-interface as the real model. `replay --recipe` never needs a key: it uses no LLM at all.
-
-## Demo path
-
-Start the fake bank in one terminal (port 5050). It creates `bank_app/data/bank.db` from the seed data on
-first start. Delete that file to start fresh.
+Start the fake bank in one terminal and leave it running (port 5050). It creates `bank_app/data/bank.db` from
+the seed data on first start; delete that file to start fresh.
 
 ```bash
 python bank_app/app.py
 ```
 
-In a second terminal, with the venv active:
+Run the commands below in a second terminal, with the venv active. The repo already contains an approved
+recipe (`member.lookup_savings_balance`), so replay works straight away.
 
-1. See the recipe catalog:
-   ```bash
-   python run.py list
-   ```
-2. Run the agent on a goal and a target. The LLM drives the website live, then the run is saved as a
-   draft recipe (drop `--mock` to use the real model). The target (app and start page) is optional:
-   without it, `config/settings.json` decides (`http://localhost:5050`, starting at `/search`):
-   ```bash
-   python run.py discover "Look up member 12345 and read their savings balance" --mock
-   ```
-   ```bash
-   python run.py discover "Look up member 12345 and read their savings balance" --target http://localhost:5050/search --mock
-   ```
-   A target outside the allowlist (`config/policy.json`) is refused before anything starts. The recipe
-   records where it was recorded (`app.entry_url`), and replay always runs it against that app.
-3. Review the draft and approve it:
-   ```bash
-   python run.py approve member.lookup_savings_balance
-   ```
-4. Replay the recipe for another member: deterministic, no LLM at all:
-   ```bash
-   python run.py replay --recipe member.lookup_savings_balance --input member_id=12346
-   ```
-5. Ask in plain English. A matching recipe is replayed; the LLM only picks the recipe and its inputs. With no
-   matching recipe, `ask` runs discovery instead and saves a new draft:
-   ```bash
-   python run.py ask "What's the savings balance for member 23456?" --mock
-   ```
-6. Error cases:
-   ```bash
-   python run.py replay --recipe member.lookup_savings_balance --input member_id=99999
-   ```
-   ```bash
-   python run.py replay --recipe member.lookup_savings_balance --input member_id=12345 --inject popup
-   ```
-   ```bash
-   python run.py replay --recipe member.lookup_savings_balance --input member_id=12345 --inject server_error
-   ```
-   `99999` returns the business outcome `MEMBER_NOT_FOUND`. `--inject popup` shows a dialog that the recipe's
-   error handler dismisses. `--inject server_error` is a hard failure: with you at the keyboard, the browser
-   is handed to you (fix it in the window, e.g. Back then Search, then type `resume` in the terminal);
-   with `--no-human` it stops with a screenshot, the accessibility tree and a trace.
-7. A data-changing action asks for approval at the Confirm button (answer `yes` or `no`):
-   ```bash
-   python run.py discover 'Open a Money Market account for member 12399 with an initial deposit of $50.00' --mock
-   ```
+### With an API key (real LLM)
 
-Every run prints how it was answered (`answered by: RECIPE` or `LLM DISCOVERY`, and what the LLM was used for)
-and writes `runs/<run_id>/` with `log.jsonl` and `result.json` (masked).
+Set up the key first (see LLM API key above). Then run the commands as they are: discovery, request matching
+and recovery use the real model. Requests can be phrased freely, e.g. "How much does member 23456 have in
+savings?".
+
+### Without an API key (`--mock`)
+
+Add `--mock` to `discover`, `ask` and `replay "<request>"`. A scripted mock LLM replaces the model behind the
+same interface; everything else (browser, safety, recording, replay, takeover, logs) runs exactly the same.
+The mock knows three tasks and fixed phrasings:
+
+- `Look up member <id> and read their savings balance` (and requests like `What's the savings balance for member <id>?`)
+- `Open a <account type> account for member <id> with an initial deposit of $<amount>`
+- `Update the phone number of member <id> to <555-555-0100>`
+
+Commands that use no LLM at all (`replay --recipe`, `approve`, `list`) are the same in both modes. When a
+step breaks during `ask`, the real model tries a bounded recovery; with `--mock`, recovery declines and the
+step goes to a human.
+
+### Demo path
+
+Run the agent on a goal, approve the resulting recipe, then replay it deterministically. Drop `--mock` to use
+the real model.
+
+```bash
+python run.py discover "Look up member 12345 and read their savings balance" --mock
+```
+```bash
+python run.py approve member.lookup_savings_balance
+```
+```bash
+python run.py replay --recipe member.lookup_savings_balance --input member_id=12346
+```
+```bash
+python run.py replay --recipe member.lookup_savings_balance --input member_id=99999
+```
+
+The first command records a new draft version of the recipe, the second approves it, the third replays it
+for another member with no LLM at all, and the last shows a business outcome (`MEMBER_NOT_FOUND`). The table
+below covers every other feature.
+
+### Which command for which feature
+
+| Feature | With an API key | Without an API key |
+| --- | --- | --- |
+| See the recipe catalog | `python run.py list` | same |
+| Discover a task (the LLM drives the UI; saves a draft recipe) | `python run.py discover "Look up member 12345 and read their savings balance"` | add `--mock` |
+| Discover on a given app and start page | `python run.py discover "Look up member 12345 and read their savings balance" --target http://localhost:5050/search` | add `--mock` |
+| Review and approve a recipe | `python run.py approve member.lookup_savings_balance` | same |
+| Replay a recipe, no LLM at all | `python run.py replay --recipe member.lookup_savings_balance --input member_id=12346` | same |
+| Ask in plain English (recipe if one fits, otherwise discovery) | `python run.py ask "How much does member 23456 have in savings?"` | `python run.py ask "What's the savings balance for member 23456?" --mock` |
+| Strict replay from a request (never discovers) | `python run.py replay "What's the savings balance for member 12346?"` | add `--mock` |
+| Business outcome: member not found | `python run.py replay --recipe member.lookup_savings_balance --input member_id=99999` | same |
+| Recoverable: popup dismissed by the recipe | `python run.py replay --recipe member.lookup_savings_balance --input member_id=12345 --inject popup` | same |
+| Recoverable: slow page, waited out | `python run.py replay --recipe member.lookup_savings_balance --input member_id=12345 --inject slow_page` | same |
+| Hard failure, then human takeover (type `resume` or `abort`) | `python run.py replay --recipe member.lookup_savings_balance --input member_id=12345 --inject server_error` | same |
+| Hard failure with evidence, no human | the same command plus `--no-human` | same |
+| Risky action: approval at Confirm (`yes` or `no`) | `python run.py discover 'Open a Money Market account for member 12399 with an initial deposit of $50.00'` | add `--mock` |
+| Another data-changing task | `python run.py discover "Update the phone number of member 12346 to 555-222-0199"` | add `--mock` |
+| Run the tests | `pytest -m "not browser"` (fast) or `pytest` (all) | same: tests never call an LLM |
+
+Notes:
+
+- Use single quotes around goals that contain `$`, so the shell does not treat `$50` as a variable.
+- In the takeover case, fix the page in the browser window (e.g. Back, then Search) and type `resume` in the
+  terminal. Replay continues from the step that matches the page you left.
+- A target outside the allowlist (`config/policy.json`) is refused before anything starts. A recipe records the
+  app it was recorded on (`app.entry_url`), and replay always runs it against that app.
+- Every run prints how it was answered (`answered by: RECIPE` or `LLM DISCOVERY`, and what the LLM was used
+  for) and writes `runs/<run_id>/` with `log.jsonl` and `result.json`, both masked.
+- Useful flags: `--no-human` (no approvals or takeover: risky steps are rejected), `--fast` (no pause before
+  each action), `--slow`, `--auto-close`, `--allow-draft` (let `replay` run a draft recipe),
+  `--inject <popup|slow_page|session_expired|server_error> --at-step N`.
+
+### Commands
 
 | Command | What it does |
 | --- | --- |
 | `ask "<request>" [--target URL]` | Main command: a matching recipe is replayed; on an unexpected step failure, one bounded LLM recovery attempt, then a human. No match: LLM discovery, new draft. With `--target`, only recipes recorded for that app are considered. |
 | `replay "<request>"` | Strict: recipes only, never falls back to discovery or LLM recovery. Drafts refused without `--allow-draft`. |
-| `replay --recipe <id> --input k=v` | Strict, and no LLM anywhere, not even for matching. No `--target`: a recipe runs against the app it was recorded on. |
+| `replay --recipe <id> --input k=v` | Strict, and no LLM anywhere, not even for matching. |
 | `discover "<goal>" [--target URL]` | Discovery agent on a goal and target; a successful run becomes a draft recipe. |
 | `approve <id>` | Shows a review summary and marks the latest version approved. |
 | `list` | The catalog: versions, status, inputs and outputs. |
-
-Useful flags: `--mock`, `--no-human` (no approvals or takeover: risky steps are rejected), `--fast` (no pause
-before each action), `--slow`, `--auto-close`, `--inject <popup|slow_page|session_expired|server_error>`.
 
 ## How this was built
 

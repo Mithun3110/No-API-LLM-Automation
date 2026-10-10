@@ -21,6 +21,8 @@ MAX_API_ATTEMPTS = 3  # transient API errors (rate limit, timeout) are retried a
 # Per request. The SDK default is 600 s with 2 hidden retries: a hung request looked like a frozen
 # run for up to 30 minutes. Retries are done by _with_retries instead, where they are visible.
 REQUEST_TIMEOUT_S = 60
+RATE_LIMIT_WAIT_S = 20        # when the provider does not say how long to wait
+MAX_RATE_LIMIT_WAIT_S = 60    # a per-minute limit has reset by then
 
 
 class LLMError(Exception):
@@ -52,7 +54,22 @@ def _with_retries(call):
             transient = transient or "tool call validation failed" in str(e).lower()
             if not transient or attempt == MAX_API_ATTEMPTS:
                 raise LLMError(f"{type(e).__name__}: {str(e)[:300]}") from e
-            time.sleep(2 * attempt)
+            time.sleep(_backoff_s(e, attempt))
+
+
+def _backoff_s(error: Exception, attempt: int) -> float:
+    """How long to wait before retrying. A rate limit (e.g. Groq's tokens per minute) says how long
+    in its retry-after header; a short fixed backoff would retry while the limit still applies."""
+    if type(error).__name__ == "RateLimitError":
+        headers = getattr(getattr(error, "response", None), "headers", None) or {}
+        try:
+            wait = float(headers.get("retry-after", RATE_LIMIT_WAIT_S))
+        except ValueError:
+            wait = RATE_LIMIT_WAIT_S
+        wait = min(max(wait, 1), MAX_RATE_LIMIT_WAIT_S)
+        print(f"  [llm] rate limit reached, waiting {wait:.0f} s before retrying")
+        return wait
+    return 2 * attempt
 
 
 class OpenAICompatibleClient:
